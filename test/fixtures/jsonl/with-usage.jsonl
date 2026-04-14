@@ -1,0 +1,5 @@
+{"type":"user","message":{"content":[{"type":"text","text":"hi"}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"hello"}],"usage":{"input_tokens":10,"output_tokens":20,"cache_read_input_tokens":100,"cache_creation_input_tokens":200}}}
+{"type":"user","message":{"content":[{"type":"text","text":"more"}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"ok"}],"usage":{"input_tokens":5,"output_tokens":15,"cache_read_input_tokens":300,"cache_creation_input_tokens":50}}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"no usage block here"}]}}

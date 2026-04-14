@@ -1,0 +1,2 @@
+{"type":"assistant","timestamp":"2024-01-01T10:00:01.000Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Task","input":{"subagent_type":"Explore","description":"search code","prompt":"..."}}]}}
+{"type":"user","timestamp":"2024-01-01T10:00:05.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"done"}]}}

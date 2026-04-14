@@ -1,0 +1,5 @@
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"s1","name":"Skill","input":{"skill":"brainstorming"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"s2","name":"Skill","input":{"skill":"brainstorming"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"s3","name":"Skill","input":{"skill":"writing-plans"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"a1","name":"Agent","input":{"subagent_type":"general-purpose","description":"x","prompt":"y"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"a2","name":"Agent","input":{"subagent_type":"Explore","description":"x","prompt":"y"}}]}}

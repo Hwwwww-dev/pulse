@@ -1,0 +1,39 @@
+{
+  "session_id": "abc123def456",
+  "session_name": "my-session",
+  "transcript_path": "/tmp/full.jsonl",
+  "cwd": "/home/me/projects/pulse",
+  "version": "2.1.90",
+  "model": { "id": "claude-opus-4-6", "display_name": "Opus" },
+  "workspace": {
+    "current_dir": "/home/me/projects/pulse",
+    "project_dir": "/home/me/projects/pulse",
+    "added_dirs": []
+  },
+  "output_style": { "name": "default" },
+  "cost": {
+    "total_cost_usd": 0.1234,
+    "total_duration_ms": 1425000,
+    "total_api_duration_ms": 145000,
+    "total_lines_added": 156,
+    "total_lines_removed": 23
+  },
+  "context_window": {
+    "total_input_tokens": 15234,
+    "total_output_tokens": 4521,
+    "context_window_size": 200000,
+    "used_percentage": 67,
+    "remaining_percentage": 33,
+    "current_usage": {
+      "input_tokens": 8500,
+      "output_tokens": 1200,
+      "cache_creation_input_tokens": 5000,
+      "cache_read_input_tokens": 2000
+    }
+  },
+  "exceeds_200k_tokens": false,
+  "rate_limits": {
+    "five_hour": { "used_percentage": 23.5, "resets_at": 2000000000 },
+    "seven_day": { "used_percentage": 41.2, "resets_at": 2000500000 }
+  }
+}

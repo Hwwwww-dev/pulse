@@ -1,0 +1,4 @@
+{"type":"user","timestamp":"2024-01-01T10:00:00.000Z","message":{"role":"user","content":"explore and plan"}}
+{"type":"assistant","timestamp":"2024-01-01T10:00:01.000Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"a1","name":"Task","input":{"subagent_type":"Explore","prompt":"..."}}]}}
+{"type":"assistant","timestamp":"2024-01-01T10:00:02.000Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"a2","name":"Task","input":{"subagent_type":"Plan","prompt":"..."}}]}}
+{"type":"assistant","timestamp":"2024-01-01T10:00:03.000Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"a3","name":"Task","input":{"subagent_type":"Explore","prompt":"..."}}]}}
