@@ -6,7 +6,6 @@ import {
   writeCache,
   readSession,
   findPriorSessionInProject,
-  readIndex,
 } from "../core/cache.ts";
 import { carryForwardFromPrior } from "../core/carryForward.ts";
 import { runGc } from "../core/gc.ts";
@@ -14,6 +13,50 @@ import { renderSafe } from "../render/engine.ts";
 import { loadConfig } from "../config/store.ts";
 import type { PulseConfig } from "../config/schema.ts";
 import type { ClaudeStdinPayload, PulseSnapshot } from "../core/types.ts";
+
+/**
+ * Build a snapshot with all counters/costs/tokens zeroed, used on startup
+ * when no stdin payload has arrived yet. Keeps the statusline visible but
+ * avoids leaking a previous session's numbers into a fresh context.
+ */
+function zeroSnapshot(): PulseSnapshot {
+  const cwd = process.cwd();
+  const claude: ClaudeStdinPayload = {
+    session_id: "",
+    transcript_path: "",
+    cwd,
+    version: "",
+    model: { id: "", display_name: "" },
+    workspace: { current_dir: cwd, project_dir: cwd, added_dirs: [] },
+    cost: {
+      total_cost_usd: 0,
+      total_duration_ms: 0,
+      total_api_duration_ms: 0,
+      total_lines_added: 0,
+      total_lines_removed: 0,
+    },
+    context_window: {
+      total_input_tokens: 0,
+      total_output_tokens: 0,
+      context_window_size: 200000,
+      used_percentage: 0,
+      remaining_percentage: 100,
+      current_usage: {
+        input_tokens: 0,
+        output_tokens: 0,
+        cache_creation_input_tokens: 0,
+        cache_read_input_tokens: 0,
+      },
+    },
+    exceeds_200k_tokens: false,
+  };
+  return {
+    schema_version: 2,
+    captured_at: Date.now(),
+    claude,
+    counters: emptyCounters(),
+  };
+}
 
 export async function runRenderModeWithPayload(
   payload: ClaudeStdinPayload,
@@ -60,39 +103,14 @@ export async function runRenderModeWithPayload(
   return text;
 }
 
-/**
- * Startup replay: when Claude Code invokes pulse without a stdin payload
- * (e.g. on first statusline render before any session event), fall back to
- * the most recently cached session snapshot so the bar is populated instead
- * of empty. Best-effort — any failure returns undefined and the caller emits
- * an empty string.
- */
-async function replayLatestSnapshot(): Promise<PulseSnapshot | undefined> {
-  try {
-    const index = await readIndex();
-    const latest = index?.sessions[0];
-    if (!latest) return undefined;
-    const session = await readSession(latest.session_id);
-    return session?.snapshot;
-  } catch {
-    return undefined;
-  }
-}
-
 export async function runRenderMode(): Promise<void> {
   const config = await loadConfig();
   const stdin = await readStdinJson(200);
   if (!stdin.ok) {
-    // No live payload — replay the most recent cached snapshot so the
-    // statusline is not blank before the first session event.
-    if (config.cache.enabled) {
-      const snapshot = await replayLatestSnapshot();
-      if (snapshot) {
-        process.stdout.write(`${renderSafe(snapshot, config)}\n`);
-        return;
-      }
-    }
-    process.stdout.write("");
+    // No live payload — render a zero snapshot so the statusline is visible
+    // at startup without leaking a prior session's numbers. Real data takes
+    // over once the first stdin event arrives.
+    process.stdout.write(`${renderSafe(zeroSnapshot(), config)}\n`);
     return;
   }
   const text = await runRenderModeWithPayload(stdin.data, config);
