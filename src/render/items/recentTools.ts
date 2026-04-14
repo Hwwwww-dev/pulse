@@ -13,13 +13,20 @@ export const recentToolsRenderer = (snap: PulseSnapshot, item: Item): string => 
   if (!group) {
     return slice.map((t) => truncateName(t.name, nameMax)).join(sep);
   }
-  // group adjacent same-name
-  const groups: Array<{ name: string; count: number }> = [];
-  for (const t of slice) {
-    const last = groups[groups.length - 1];
-    if (last && last.name === t.name) last.count++;
-    else groups.push({ name: t.name, count: 1 });
-  }
+  // Collapse all occurrences of each tool in the slice (not just adjacent),
+  // ordered by most-recent appearance so freshly-used tools sit at the right.
+  const byName = new Map<string, { count: number; lastIdx: number }>();
+  slice.forEach((t, i) => {
+    const cur = byName.get(t.name);
+    if (cur) {
+      cur.count += 1;
+      cur.lastIdx = i;
+    } else {
+      byName.set(t.name, { count: 1, lastIdx: i });
+    }
+  });
+  const groups = Array.from(byName, ([name, v]) => ({ name, count: v.count, lastIdx: v.lastIdx }))
+    .sort((a, b) => a.lastIdx - b.lastIdx);
   return groups
     .map((g) => g.count > 1 ? `${truncateName(g.name, nameMax)}${countGlue}\u00d7${g.count}` : truncateName(g.name, nameMax))
     .join(sep);

@@ -282,42 +282,60 @@ export async function parseJsonlIncremental(
     startLine = prevCursor.last_line_number;
   }
 
-  const endOffset = Math.min(size, startOffset + maxBytesPerCall);
-  if (endOffset <= startOffset) {
-    return {
-      counters: startCounters,
-      cursor: {
-        transcript_path: transcriptPath,
-        last_byte_offset: startOffset,
-        last_line_number: startLine,
-        counters: startCounters,
-        updated_at: Date.now(),
-        schema_version: 2,
-      } as JsonlCursor,
-    };
-  }
-
-  const slice = await file.slice(startOffset, endOffset).text();
   const counters = startCounters;
   let lineNumber = startLine;
-  let consumedBytes = 0;
-  let idx = 0;
-  while (true) {
-    const nl = slice.indexOf("\n", idx);
-    if (nl < 0) break;
-    const line = slice.slice(idx, nl);
-    consumeLine(counters, line);
-    lineNumber += 1;
-    const byteLen = new TextEncoder().encode(line + "\n").length;
-    consumedBytes += byteLen;
-    idx = nl + 1;
+  let offset = startOffset;
+  const chunkSize = Math.max(maxBytesPerCall, 64 * 1024);
+
+  // Loop chunks until EOF. maxBytesPerCall is a chunk-read cap (for memory),
+  // not a total-read cap — otherwise `claude --resume` on a large replayed
+  // transcript would undercount tools until many frames elapsed.
+  while (offset < size) {
+    const chunkEnd = Math.min(size, offset + chunkSize);
+    const slice = await file.slice(offset, chunkEnd).text();
+    let idx = 0;
+    let chunkConsumed = 0;
+    while (true) {
+      const nl = slice.indexOf("\n", idx);
+      if (nl < 0) break;
+      // Strip optional trailing \r so CRLF transcripts parse identically to LF.
+      const raw = slice.slice(idx, nl);
+      const line = raw.endsWith("\r") ? raw.slice(0, -1) : raw;
+      consumeLine(counters, line);
+      lineNumber += 1;
+      chunkConsumed += new TextEncoder().encode(raw + "\n").length;
+      idx = nl + 1;
+    }
+    if (chunkConsumed === 0) {
+      // No complete line in this chunk.
+      //  - At EOF: normal — partial trailing line, leave cursor at offset.
+      //  - Mid-file: a single line is larger than chunkSize. Read remainder
+      //    in one shot so oversized lines still get parsed.
+      if (chunkEnd >= size) break;
+      const rest = await file.slice(offset, size).text();
+      let ri = 0;
+      let rc = 0;
+      while (true) {
+        const nl = rest.indexOf("\n", ri);
+        if (nl < 0) break;
+        const raw = rest.slice(ri, nl);
+        const line = raw.endsWith("\r") ? raw.slice(0, -1) : raw;
+        consumeLine(counters, line);
+        lineNumber += 1;
+        rc += new TextEncoder().encode(raw + "\n").length;
+        ri = nl + 1;
+      }
+      offset += rc;
+      break;
+    }
+    offset += chunkConsumed;
   }
 
   return {
     counters,
     cursor: {
       transcript_path: transcriptPath,
-      last_byte_offset: startOffset + consumedBytes,
+      last_byte_offset: offset,
       last_line_number: lineNumber,
       counters,
       updated_at: Date.now(),

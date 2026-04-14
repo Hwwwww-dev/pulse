@@ -189,7 +189,7 @@ test("agent_calls with breakdown", () => {
       options: { show_breakdown: true, breakdown_top_n: 2 },
     }),
   );
-  expect(out).toBe("5 (Explore:3 Plan:2)");
+  expect(out).toBe("5 (Explore\u00d73 Plan\u00d72)");
 });
 
 test("git_branch shows dirty marker", () => {
@@ -265,7 +265,7 @@ test("skill_calls total", () => {
       options: { show_breakdown: true, breakdown_top_n: 2 },
     }),
   );
-  expect(out).toBe("5 (brainstorming:3 writing-plans:2)");
+  expect(out).toBe("5 (brainstorming\u00d73 writing-plans\u00d72)");
 });
 
 test("tool_call shows count for specified tool_name", () => {
