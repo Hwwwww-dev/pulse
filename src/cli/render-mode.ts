@@ -6,6 +6,7 @@ import {
   writeCache,
   readSession,
   findPriorSessionInProject,
+  readIndex,
 } from "../core/cache.ts";
 import { carryForwardFromPrior } from "../core/carryForward.ts";
 import { runGc } from "../core/gc.ts";
@@ -15,13 +16,12 @@ import type { PulseConfig } from "../config/schema.ts";
 import type { ClaudeStdinPayload, PulseSnapshot } from "../core/types.ts";
 
 /**
- * Build a snapshot with all counters/costs/tokens zeroed, used on startup
- * when no stdin payload has arrived yet. Keeps the statusline visible but
- * avoids leaking a previous session's numbers into a fresh context.
+ * Build an empty ClaudeStdinPayload — used as a fallback when no cached
+ * session is available on startup. All user-facing numbers are zero.
  */
-function zeroSnapshot(): PulseSnapshot {
+function emptyClaudePayload(): ClaudeStdinPayload {
   const cwd = process.cwd();
-  const claude: ClaudeStdinPayload = {
+  return {
     session_id: "",
     transcript_path: "",
     cwd,
@@ -50,12 +50,55 @@ function zeroSnapshot(): PulseSnapshot {
     },
     exceeds_200k_tokens: false,
   };
-  return {
+}
+
+/**
+ * Startup snapshot: preserves stable context (model, git branch, rate_limits)
+ * from the most recent cached session, but zeros the per-session counters
+ * (ctx/in/out/cost/tool calls/etc). This keeps the statusline informative
+ * at startup without leaking the previous session's live numbers into a
+ * fresh context.
+ */
+async function startupSnapshot(): Promise<PulseSnapshot> {
+  const fallback: PulseSnapshot = {
     schema_version: 2,
     captured_at: Date.now(),
-    claude,
+    claude: emptyClaudePayload(),
     counters: emptyCounters(),
   };
+
+  try {
+    const index = await readIndex();
+    const latest = index?.sessions[0];
+    if (!latest) return fallback;
+    const session = await readSession(latest.session_id);
+    const prior = session?.snapshot;
+    if (!prior) return fallback;
+
+    // Carry over: model, workspace, rate_limits, git branch/dirty state.
+    // Zero out: cost, context_window, counters. Session identity is also
+    // cleared so downstream carry-forward treats this as a fresh session.
+    const empty = emptyClaudePayload();
+    const claude: ClaudeStdinPayload = {
+      ...empty,
+      cwd: prior.claude.cwd || empty.cwd,
+      version: prior.claude.version,
+      model: prior.claude.model,
+      workspace: prior.claude.workspace,
+    };
+    if (prior.claude.output_style) claude.output_style = prior.claude.output_style;
+    if (prior.claude.rate_limits) claude.rate_limits = prior.claude.rate_limits;
+    const snap: PulseSnapshot = {
+      schema_version: 2,
+      captured_at: Date.now(),
+      claude,
+      counters: emptyCounters(),
+    };
+    if (prior.git) snap.git = prior.git;
+    return snap;
+  } catch {
+    return fallback;
+  }
 }
 
 export async function runRenderModeWithPayload(
@@ -110,7 +153,8 @@ export async function runRenderMode(): Promise<void> {
     // No live payload — render a zero snapshot so the statusline is visible
     // at startup without leaking a prior session's numbers. Real data takes
     // over once the first stdin event arrives.
-    process.stdout.write(`${renderSafe(zeroSnapshot(), config)}\n`);
+    const snap = await startupSnapshot();
+    process.stdout.write(`${renderSafe(snap, config)}\n`);
     return;
   }
   const text = await runRenderModeWithPayload(stdin.data, config);
