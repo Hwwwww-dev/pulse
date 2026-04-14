@@ -23,45 +23,8 @@ function padToWidth(value: string, width: number, align: "left" | "right"): stri
   return align === "left" ? value + pad : pad + value;
 }
 
-// Default stable widths for numeric items so the surrounding layout stops
-// jumping as digits flip in/out. Only applied when the user hasn't set an
-// explicit options.min_width (opt-out via min_width: 0). Compound renderers
-// (tokens_summary with multiple parts, breakdown-enabled counters, bars) are
-// intentionally excluded — their width is inherently variable. Overflow is
-// always allowed, so oversized values just push the surroundings out rather
-// than truncate.
-function defaultMinWidth(item: Item): number {
-  const fmt = item.options?.format;
-  switch (item.type) {
-    case "cost":
-      if (fmt === "usd4") return 8; // "$99.9999"
-      if (fmt === "compact") return 5;
-      return 6; // default usd2 — "$99.99"
-    case "duration":
-    case "api_duration":
-      if (fmt === "duration_ms") return 0;
-      if (fmt === "duration_hms") return 8; // "1h 2m 5s"
-      return 5; // compact — "1h02m" / "2m05s"
-    case "tokens_input":
-    case "tokens_output":
-    case "tokens_cache_read":
-    case "tokens_cache_create":
-      if (fmt === "tokens_full") return 0;
-      return 5; // tokens_compact — "999.9k" / "1.2M"
-    case "context_usage":
-      if (item.options?.show_bar || item.options?.ctx_show_absolute) return 0;
-      return fmt === "percent1" ? 6 : 4; // "100.0%" / "100%"
-    case "tool_calls":
-    case "agent_calls":
-    case "skill_calls":
-      if (item.options?.show_breakdown) return 0;
-      return 3;
-    case "lines_changed":
-      return 8; // "+999/-99"
-    default:
-      return 0;
-  }
-}
+// Stable widths removed: layout is allowed to jump as digits flip in/out.
+// Users can still opt in per-item via options.min_width.
 
 function renderItem(snap: PulseSnapshot, item: Item, theme: Theme | undefined): string | null {
   try {
@@ -72,10 +35,8 @@ function renderItem(snap: PulseSnapshot, item: Item, theme: Theme | undefined): 
     // / cost / duration when the underlying value is zero. Skip even when
     // hide_when_empty is not explicitly set so fresh sessions stay clean.
     if (value === "") return null;
-    // Explicit options.min_width (including 0 as opt-out) wins; otherwise
-    // fall back to the type/format default so noisy numeric slots stay
-    // stable out of the box.
-    const minW = item.options?.min_width ?? defaultMinWidth(item);
+    // Only pad when user explicitly opts in via options.min_width.
+    const minW = item.options?.min_width ?? 0;
     if (minW > 0) {
       value = padToWidth(value, minW, item.options?.min_width_align ?? "right");
     }

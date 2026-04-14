@@ -120,7 +120,7 @@ const MONTH_LONG = [
 
 function clock12(d: Date): string {
   const h24 = d.getHours();
-  const ampm = h24 < 12 ? "AM" : "PM";
+  const ampm = h24 < 12 ? "am" : "pm";
   const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
   const m = d.getMinutes();
   return m === 0 ? `${h12}${ampm}` : `${h12}:${String(m).padStart(2, "0")}${ampm}`;
@@ -159,7 +159,6 @@ function buildRelativeBody(absSec: number, opts: { long: boolean; compact: boole
   const h24 = Math.floor((absSec % 86400) / 3600);
   const totalH = Math.floor(absSec / 3600);
   const m = Math.floor((absSec % 3600) / 60);
-  const s = absSec % 60;
 
   if (opts.long && d > 0) {
     // Day-level decomposition: drop trailing zero units.
@@ -171,10 +170,8 @@ function buildRelativeBody(absSec: number, opts: { long: boolean; compact: boole
   if (totalH > 0) {
     return m > 0 ? `${totalH}h${sep}${m}m` : `${totalH}h`;
   }
-  if (m > 0) {
-    return s > 0 ? `${m}m${sep}${s}s` : `${m}m`;
-  }
-  return `${s}s`;
+  if (m > 0) return `${m}m`;
+  return "<1m";
 }
 
 function isSameDay(a: Date, b: Date): boolean {

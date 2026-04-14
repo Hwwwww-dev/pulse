@@ -2,13 +2,18 @@ import { readStdinJson } from "../input/stdin.ts";
 import { parseJsonlIncremental, emptyCounters } from "../input/jsonl.ts";
 import { readGitInfo } from "../input/git.ts";
 import { aggregate } from "../core/aggregator.ts";
-import { writeCache, readSession, findPriorSessionInProject } from "../core/cache.ts";
+import {
+  writeCache,
+  readSession,
+  findPriorSessionInProject,
+  readIndex,
+} from "../core/cache.ts";
 import { carryForwardFromPrior } from "../core/carryForward.ts";
 import { runGc } from "../core/gc.ts";
 import { renderSafe } from "../render/engine.ts";
 import { loadConfig } from "../config/store.ts";
 import type { PulseConfig } from "../config/schema.ts";
-import type { ClaudeStdinPayload } from "../core/types.ts";
+import type { ClaudeStdinPayload, PulseSnapshot } from "../core/types.ts";
 
 export async function runRenderModeWithPayload(
   payload: ClaudeStdinPayload,
@@ -55,10 +60,38 @@ export async function runRenderModeWithPayload(
   return text;
 }
 
+/**
+ * Startup replay: when Claude Code invokes pulse without a stdin payload
+ * (e.g. on first statusline render before any session event), fall back to
+ * the most recently cached session snapshot so the bar is populated instead
+ * of empty. Best-effort — any failure returns undefined and the caller emits
+ * an empty string.
+ */
+async function replayLatestSnapshot(): Promise<PulseSnapshot | undefined> {
+  try {
+    const index = await readIndex();
+    const latest = index?.sessions[0];
+    if (!latest) return undefined;
+    const session = await readSession(latest.session_id);
+    return session?.snapshot;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function runRenderMode(): Promise<void> {
   const config = await loadConfig();
   const stdin = await readStdinJson(200);
   if (!stdin.ok) {
+    // No live payload — replay the most recent cached snapshot so the
+    // statusline is not blank before the first session event.
+    if (config.cache.enabled) {
+      const snapshot = await replayLatestSnapshot();
+      if (snapshot) {
+        process.stdout.write(`${renderSafe(snapshot, config)}\n`);
+        return;
+      }
+    }
     process.stdout.write("");
     return;
   }

@@ -30,7 +30,7 @@ async function settle(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 30));
 }
 
-test("EditItemModal separates editable fields from read-only metadata", async () => {
+test("EditItemModal shows type description inline and hides Editable/Read-only/id", async () => {
   const app = renderModal({
     id: "i12",
     type: "reset_in_5h",
@@ -41,10 +41,15 @@ test("EditItemModal separates editable fields from read-only metadata", async ()
   await settle();
 
   const frame = app.lastFrame() ?? "";
-  expect(frame).toContain("Editable");
-  expect(frame).toContain("Read-only");
-  expect(frame.indexOf("label:")).toBeGreaterThan(frame.indexOf("Editable"));
-  expect(frame.indexOf("id:")).toBeGreaterThan(frame.indexOf("Read-only"));
+  // "Editable" / "Read-only" section headers have been removed.
+  expect(frame).not.toContain("Editable");
+  expect(frame).not.toContain("Read-only");
+  // The item id is no longer displayed.
+  expect(frame).not.toContain("id:           i12");
+  // Type description now sits directly under the type field.
+  expect(frame).toContain("type:");
+  expect(frame.indexOf("↳")).toBeGreaterThan(frame.indexOf("type:"));
+  expect(frame.indexOf("label:")).toBeGreaterThan(frame.indexOf("↳"));
   expect(frame).toContain('trailing_separator: " "');
   expect(frame).toContain("format:");
 

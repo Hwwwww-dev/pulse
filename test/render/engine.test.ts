@@ -222,8 +222,7 @@ test("blink applies to session/weekly limits", () => {
   expect(count).toBeGreaterThanOrEqual(2);
 });
 
-test("auto min_width pads numeric items by default", () => {
-  // cost usd2 pads to 6 chars ("$99.99"), tokens_compact pads to 5 chars.
+test("numeric items are NOT padded by default (stable widths removed)", () => {
   const config = {
     ...defaultConfig,
     lines: [
@@ -237,10 +236,12 @@ test("auto min_width pads numeric items by default", () => {
     ],
   };
   const out = stripAnsi(renderSafe(snap, config));
-  // Expect right-aligned padding
+  // No leading/trailing whitespace padding on either side of the separator.
   const [costStr, tokStr] = out.split("|") as [string, string];
-  expect(costStr.length).toBeGreaterThanOrEqual(6);
-  expect(tokStr.length).toBeGreaterThanOrEqual(5);
+  expect(costStr.startsWith(" ")).toBe(false);
+  expect(costStr.endsWith(" ")).toBe(false);
+  expect(tokStr.startsWith(" ")).toBe(false);
+  expect(tokStr.endsWith(" ")).toBe(false);
 });
 
 test("explicit min_width: 0 opts out of auto padding", () => {

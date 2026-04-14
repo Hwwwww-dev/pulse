@@ -7,6 +7,7 @@ import { ColorPicker, PALETTE } from "../components/ColorPicker.tsx";
 import { ITEM_TYPE_DESCRIPTIONS } from "../data/itemTypeDescriptions.ts";
 import { TOOL_CATALOG } from "../data/toolCatalog.ts";
 import { defForType, BAR_STYLE_PRESETS } from "../data/itemTypeConfig.ts";
+import { TypePickerModal } from "./TypePickerModal.tsx";
 
 export interface EditItemModalProps {
   item: Item;
@@ -150,10 +151,20 @@ export function EditItemModal({ item, snapshot, onChange, onClose, onCancel }: E
   const [focus, setFocus] = useState<number>(() => initialFocusFieldIndex(FIELDS));
   const safeFocus = Math.min(focus, FIELDS.length - 1);
   const activeField = FIELDS[safeFocus] ?? "type";
+  // When the type picker overlay is open, the parent input handler must stay
+  // inert so keys (search text, ↑↓, Enter) only reach the picker.
+  const [typePickerOpen, setTypePickerOpen] = useState<boolean>(false);
 
   useInput((input, key) => {
+    if (typePickerOpen) return;
     if (key.escape) { onCancel(); return; }
-    if (key.return) { onClose(); return; }
+    // On the type field, Enter opens the picker instead of saving — users
+    // need a way to launch the overlay without a binding collision.
+    if (key.return) {
+      if (activeField === "type") { setTypePickerOpen(true); return; }
+      onClose();
+      return;
+    }
     if (key.upArrow) { setFocus((f) => (f - 1 + FIELDS.length) % FIELDS.length); return; }
     if (key.downArrow) { setFocus((f) => (f + 1) % FIELDS.length); return; }
 
@@ -178,6 +189,10 @@ export function EditItemModal({ item, snapshot, onChange, onClose, onCancel }: E
     }
 
     if (activeField === "type") {
+      // Space also opens the picker — matches the "[Space] pick" hint and
+      // gives users a single obvious key without competing with label text
+      // entry on other fields.
+      if (input === " ") { setTypePickerOpen(true); return; }
       if (key.leftArrow || key.rightArrow) {
         const idx = ITEM_TYPES.indexOf(item.type);
         const safeIdx = idx < 0 ? 0 : idx;
@@ -366,7 +381,9 @@ export function EditItemModal({ item, snapshot, onChange, onClose, onCancel }: E
   });
 
   const marker = (f: FieldKey): string => (activeField === f ? "▸" : " ");
-  const description = ITEM_TYPE_DESCRIPTIONS[item.type] ?? "";
+  const doc = ITEM_TYPE_DESCRIPTIONS[item.type];
+  const descSummary = doc?.summary ?? "";
+  const descDetails = doc?.details ?? [];
   const nameValue = currentName(item) ?? "(unset)";
   const nameOptions = availableNames(item.type, snapshot);
   const labelValue = textFieldValue(item, "label");
@@ -380,12 +397,30 @@ export function EditItemModal({ item, snapshot, onChange, onClose, onCancel }: E
 
   const children: React.ReactNode[] = [
     React.createElement(Text, { key: "title", bold: true }, `Edit Item`),
-    React.createElement(Text, { key: "editable-title", bold: true }, " Editable"),
     React.createElement(
       Text,
       { key: "type" },
-      `${marker("type")} type:         ⟨ ${item.type} ⟩`,
+      `${marker("type")} type:         ⟨ ${item.type} ⟩${activeField === "type" ? "   [Enter/Space] pick" : ""}`,
     ),
+    // Type description sits immediately under the type field so it's clearly
+    // tied to the current selection. Summary first, then any detail lines
+    // indented under a ↳ prefix.
+    ...(descSummary
+      ? [
+          React.createElement(
+            Text,
+            { key: "desc-summary", dimColor: true },
+            `   ↳ ${descSummary}`,
+          ),
+          ...descDetails.map((line, i) =>
+            React.createElement(
+              Text,
+              { key: `desc-detail-${i}`, dimColor: true },
+              `     ${line}`,
+            ),
+          ),
+        ]
+      : []),
   ];
 
   if (needsNameField) {
@@ -489,19 +524,25 @@ export function EditItemModal({ item, snapshot, onChange, onClose, onCancel }: E
         onChange: (c) => onChange({ ...item, style: { ...(item.style ?? {}), fg: c } }),
       }),
     ),
-    React.createElement(Text, { key: "readonly-title", bold: true }, " Read-only"),
-    React.createElement(
-      Text,
-      { key: "desc", dimColor: true },
-      `   ↳ ${description}`,
-    ),
-    React.createElement(Text, { key: "id", dimColor: true }, ` id:           ${item.id}`),
     React.createElement(
       Text,
       { key: "help", dimColor: true },
       " ↑↓ field · type text / ←→ change · Shift+←→ big step · Backspace delete · space toggle · [Enter] save · [Esc] cancel",
     ),
   );
+
+  if (typePickerOpen) {
+    // Render the picker overlay standalone — its own useInput owns the
+    // keyboard while open. onSelect applies the new type and closes.
+    return React.createElement(TypePickerModal, {
+      current: item.type,
+      onSelect: (next) => {
+        if (next !== item.type) onChange({ ...item, type: next });
+        setTypePickerOpen(false);
+      },
+      onCancel: () => setTypePickerOpen(false),
+    });
+  }
 
   return React.createElement(
     Box,
