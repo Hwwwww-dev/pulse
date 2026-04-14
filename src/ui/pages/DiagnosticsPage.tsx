@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Box, Text } from "ink";
 import { readGeneral, readIndex } from "../../core/cache.ts";
 import { paths } from "../../core/paths.ts";
+import { VERSION } from "../../version.ts";
 
 export function DiagnosticsPage(): React.ReactElement {
   const [generalExists, setGeneralExists] = useState(false);
@@ -25,6 +26,6 @@ export function DiagnosticsPage(): React.ReactElement {
     React.createElement(Text, null, ` general.json   ${generalExists ? "exists" : "missing"}`),
     React.createElement(Text, null, ` Sessions       ${sessionCount}`),
     React.createElement(Text, null, ` Bun            ${Bun.version}`),
-    React.createElement(Text, null, ` Pulse          0.1.0`),
+    React.createElement(Text, null, ` Pulse          ${VERSION}`),
   );
 }

@@ -8,6 +8,7 @@ import { SettingsPage } from "./pages/SettingsPage.tsx";
 import { DiagnosticsPage } from "./pages/DiagnosticsPage.tsx";
 import { HelpPage } from "./pages/HelpPage.tsx";
 import type { PulseSnapshot, TodoItem } from "../core/types.ts";
+import { VERSION } from "../version.ts";
 
 const BASE_NOW = Date.now();
 const TICK_MS = 500;
@@ -230,7 +231,7 @@ export function App(): React.ReactElement {
     React.createElement(
       Box,
       null,
-      React.createElement(Text, { bold: true }, "Pulse v0.1.0"),
+      React.createElement(Text, { bold: true }, `Pulse v${VERSION}`),
       React.createElement(Text, { dimColor: true }, "   [Tab] switch · [s] save · [r] reload · [q] quit"),
       dirty ? React.createElement(Text, { color: "yellow" }, "  ● unsaved") : null,
     ),

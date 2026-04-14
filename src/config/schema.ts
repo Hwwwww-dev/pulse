@@ -215,7 +215,12 @@ export const ItemOptionsSchema = z
     /** token_rate: which parts to show — in, out, total */
     rate_parts: z.array(z.enum(["in", "out", "total"])).optional(),
   })
-  .strict();
+  // strip unknown keys instead of rejecting: preserves forward/backward
+  // compat when fields are added/removed across pulse versions. Without
+  // this, a single unknown key from an older/newer config causes Zod to
+  // fail, loadConfig silently falls back to defaults, and save then
+  // clobbers the user's real config.
+  .strip();
 
 export const ItemSchema = z
   .object({
@@ -290,7 +295,7 @@ export const defaultConfig: PulseConfig = {
   lines: [
     {
       items: [
-        { id: "i1", type: "model", style: { fg: "#C792EA", bold: true } },
+        { id: "i1", type: "model", style: { fg: "#A8A8D7", bold: true } },
         {
           id: "i2",
           type: "context_usage",
@@ -298,11 +303,7 @@ export const defaultConfig: PulseConfig = {
           label_separator: " ",
           options: {
             format: "percent1",
-            bar_thresholds: [
-              { at: 0, fg: "#C3E88D" },
-              { at: 60, fg: "#FFCB6B" },
-              { at: 85, fg: "#F07178" },
-            ],
+            auto_color: true,
           },
         },
         { id: "i3", type: "git_branch", label: "", style: { fg: "#C3E88D" } },
@@ -318,7 +319,7 @@ export const defaultConfig: PulseConfig = {
             bar_width: 10,
             limit_show_reset: true,
             limit_reset_format: "relative_eta_compact",
-            bar_thresholds: [{ at: 80, fg: "#F07178" }],
+            auto_color: true,
           },
         },
       ],
@@ -346,7 +347,7 @@ export const defaultConfig: PulseConfig = {
             bar_width: 10,
             limit_show_reset: true,
             limit_reset_format: "relative_eta_long_compact",
-            bar_thresholds: [{ at: 80, fg: "#F07178" }],
+            auto_color: true,
           },
         },
         {
