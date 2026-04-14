@@ -21,9 +21,13 @@ function hideZero(item: Item): boolean {
   return item.hide_when_empty !== false;
 }
 
+// Unlike duration/lines, the cost item defaults to *showing* $0.00 even on
+// fresh sessions — users care about spend as a running headline figure, and a
+// blank slot reads as "broken" rather than "nothing spent yet". Opt back into
+// hiding via hide_when_empty=true.
 export const costRenderer = (snap: PulseSnapshot, item: Item): string => {
   const v = snap.claude.cost.total_cost_usd;
-  if (v === 0 && hideZero(item)) return "";
+  if (v === 0 && item.hide_when_empty === true) return "";
   return formatNumber(v, resolveCostFormat(item));
 };
 
