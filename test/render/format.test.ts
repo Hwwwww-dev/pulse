@@ -42,7 +42,7 @@ test("clock_24 / clock_24_sec / clock_12", () => {
   const d = new Date(2026, 3, 13, 14, 5, 9).getTime();
   expect(formatClock(d, "clock_24")).toBe("14:05");
   expect(formatClock(d, "clock_24_sec")).toBe("14:05:09");
-  expect(formatClock(d, "clock_12")).toBe("2:05 PM");
+  expect(formatClock(d, "clock_12")).toBe("2:05 pm");
 });
 
 test("date_iso", () => {

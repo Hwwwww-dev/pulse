@@ -17,6 +17,7 @@ export interface ItemTypeDef {
   readonly nameKey?: "tool_name" | "agent_type" | "skill_name";
   readonly extraFlags?: readonly ExtraFlag[];
   readonly extraEnums?: readonly ExtraEnum[];
+  readonly extraNums?: readonly ExtraNum[];
 }
 
 export const BAR_STYLE_PRESETS = [
@@ -43,6 +44,26 @@ export interface ExtraEnum {
   readonly options: readonly string[];
   readonly defaultValue: string;
 }
+
+export interface ExtraNum {
+  readonly label: string;
+  /** Path under item.options.* — a single key */
+  readonly key: string;
+  readonly defaultValue: number;
+  readonly min: number;
+  readonly max: number;
+  /** Only shown when this boolean flag under options is truthy. */
+  readonly requiresFlag?: string;
+}
+
+const BREAKDOWN_TOP_N_NUM: ExtraNum = {
+  label: "breakdown_top_n",
+  key: "breakdown_top_n",
+  defaultValue: 3,
+  min: 0, // 0 = show all
+  max: 20,
+  requiresFlag: "show_breakdown",
+};
 
 const LIMIT_RESET_FORMATS = [
   "relative_eta_long_compact",
@@ -193,16 +214,19 @@ export const ITEM_TYPE_DEFS: Record<ItemType, ItemTypeDef> = {
     formats: INTEGER_FORMATS,
     supportsVariant: false,
     extraFlags: [{ label: "show_breakdown", key: "show_breakdown" }],
+    extraNums: [BREAKDOWN_TOP_N_NUM],
   },
   agent_calls: {
     formats: INTEGER_FORMATS,
     supportsVariant: false,
     extraFlags: [{ label: "show_breakdown", key: "show_breakdown" }],
+    extraNums: [BREAKDOWN_TOP_N_NUM],
   },
   skill_calls: {
     formats: INTEGER_FORMATS,
     supportsVariant: false,
     extraFlags: [{ label: "show_breakdown", key: "show_breakdown" }],
+    extraNums: [BREAKDOWN_TOP_N_NUM],
   },
   tool_call: { formats: INTEGER_FORMATS, supportsVariant: false, nameKey: "tool_name" },
 

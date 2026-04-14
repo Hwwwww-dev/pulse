@@ -2,8 +2,11 @@ import type { PulseSnapshot } from "../../core/types.ts";
 import type { Item } from "../../config/schema.ts";
 
 function topN(counts: Record<string, number>, n: number): string {
-  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, n);
-  return entries.map(([k, v]) => `${k}:${v}`).join(" ");
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  // n <= 0 means "show all"
+  const entries = n <= 0 ? sorted : sorted.slice(0, n);
+  // Match recent_tools grouping style: `Name×Count`.
+  return entries.map(([k, v]) => `${k}\u00d7${v}`).join(" ");
 }
 
 function partsSep(item: Item): string {

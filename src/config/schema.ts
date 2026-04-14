@@ -143,7 +143,8 @@ export const ItemOptionsSchema = z
     /** context_usage / *_limit: render an inline bar alongside the percentage */
     show_bar: z.boolean().optional(),
     show_breakdown: z.boolean().optional(),
-    breakdown_top_n: z.number().int().min(1).max(20).optional(),
+    // 0 = show all
+    breakdown_top_n: z.number().int().min(0).max(20).optional(),
     tokens_parts: z
       .array(z.enum(["input", "output", "cache_read", "cache_create", "total"]))
       .optional(),

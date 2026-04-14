@@ -132,7 +132,7 @@ export function formatClock(unixMs: number, fmt: ClockFormat): string {
       return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
     case "clock_12": {
       const h24 = d.getHours();
-      const ampm = h24 < 12 ? "AM" : "PM";
+      const ampm = h24 < 12 ? "am" : "pm";
       const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
       return `${h12}:${pad(d.getMinutes())} ${ampm}`;
     }

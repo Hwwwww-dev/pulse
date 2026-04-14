@@ -30,7 +30,8 @@ type FieldKey =
   | "margin_right"
   | "fg"
   | `flag:${string}`
-  | `enum:${string}`;
+  | `enum:${string}`
+  | `num:${string}`;
 const ITEM_TYPES: readonly ItemType[] = ItemTypeSchema.options;
 
 // Types that require picking a specific name from the snapshot counters.
@@ -110,11 +111,20 @@ export function EditItemModal({ item, snapshot, onChange, onClose, onCancel }: E
     ? [...baseFlags, { label: "auto_color", key: "auto_color" }]
     : baseFlags;
   const extraEnums = def.extraEnums ?? [];
+  const allExtraNums = def.extraNums ?? [];
+  // Nums gated by a requiresFlag only surface when that flag is truthy.
+  const opts = (item.options as Record<string, unknown> | undefined) ?? {};
+  const extraNums = allExtraNums.filter(
+    (n) => !n.requiresFlag || Boolean(opts[n.requiresFlag]),
+  );
   const flagFields: readonly FieldKey[] = extraFlags.map(
     (f) => `flag:${f.key}` as FieldKey,
   );
   const enumFields: readonly FieldKey[] = extraEnums.map(
     (e) => `enum:${e.key}` as FieldKey,
+  );
+  const numFields: readonly FieldKey[] = extraNums.map(
+    (n) => `num:${n.key}` as FieldKey,
   );
   const FIELDS: readonly FieldKey[] = [
     "type",
@@ -127,6 +137,7 @@ export function EditItemModal({ item, snapshot, onChange, onClose, onCancel }: E
     ...(def.supportsDisplayMode ? (["display_mode"] as const) : []),
     ...(def.supportsBarStyle ? (["bar_style"] as const) : []),
     ...flagFields,
+    ...numFields,
     ...enumFields,
     "margin_left",
     "margin_right",
@@ -248,6 +259,25 @@ export function EditItemModal({ item, snapshot, onChange, onClose, onCancel }: E
       const nextOptions = {
         ...(item.options ?? {}),
         [flagKey]: !cur,
+      } as Item["options"];
+      onChange({ ...item, options: nextOptions });
+      return;
+    }
+
+    if (
+      typeof activeField === "string" &&
+      activeField.startsWith("num:") &&
+      (key.leftArrow || key.rightArrow)
+    ) {
+      const numKey = activeField.slice(4);
+      const def2 = extraNums.find((n) => n.key === numKey);
+      if (!def2) return;
+      const cur = ((item.options as Record<string, unknown> | undefined)?.[numKey] as number | undefined) ?? def2.defaultValue;
+      const delta = key.rightArrow ? 1 : -1;
+      const next = Math.max(def2.min, Math.min(def2.max, cur + delta));
+      const nextOptions = {
+        ...(item.options ?? {}),
+        [numKey]: next,
       } as Item["options"];
       onChange({ ...item, options: nextOptions });
       return;
@@ -407,6 +437,15 @@ export function EditItemModal({ item, snapshot, onChange, onClose, onCancel }: E
         Text,
         { key: `flag:${f.key}` },
         `${marker(`flag:${f.key}` as FieldKey)} ${f.label}:${" ".repeat(Math.max(1, 14 - f.label.length - 1))}${val ? "[x]" : "[ ]"}`,
+      );
+    }),
+    ...extraNums.map((n) => {
+      const val = ((item.options as Record<string, unknown> | undefined)?.[n.key] as number | undefined) ?? n.defaultValue;
+      const hint = n.min === 0 && val === 0 ? " (all)" : "";
+      return React.createElement(
+        Text,
+        { key: `num:${n.key}` },
+        `${marker(`num:${n.key}` as FieldKey)} ${n.label}:${" ".repeat(Math.max(1, 14 - n.label.length - 1))}⟨ ${val} ⟩${hint}`,
       );
     }),
     ...extraEnums.map((e) => {
