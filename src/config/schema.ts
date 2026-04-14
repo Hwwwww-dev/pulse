@@ -190,7 +190,7 @@ export const ItemOptionsSchema = z
     zero_display: z.string().optional(),
     /** custom_command: shell command to execute */
     command: z.string().optional(),
-    /** custom_command: per-call timeout in ms (default 200) */
+    /** custom_command: per-call timeout in ms (default 1000) */
     command_timeout_ms: z.number().int().positive().optional(),
     /** custom_command: cache stdout for N ms on disk (0 = no cache, default) */
     command_cache_ms: z.number().int().min(0).optional(),
