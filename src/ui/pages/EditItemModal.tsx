@@ -35,7 +35,8 @@ type FieldKey =
   | "color"
   | `flag:${string}`
   | `enum:${string}`
-  | `num:${string}`;
+  | `num:${string}`
+  | `text:${string}`;
 const ITEM_TYPES: readonly ItemType[] = ItemTypeSchema.options;
 
 // Types that require picking a specific name from the snapshot counters.
@@ -122,6 +123,7 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
     : baseFlags;
   const extraEnums = def.extraEnums ?? [];
   const allExtraNums = def.extraNums ?? [];
+  const extraTexts = def.extraTexts ?? [];
   // Flags/Nums gated by a requiresFlag only surface when that flag is truthy.
   const opts = (item.options as Record<string, unknown> | undefined) ?? {};
   const extraFlags = allExtraFlags.filter(
@@ -139,6 +141,9 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
   const numFields: readonly FieldKey[] = extraNums.map(
     (n) => `num:${n.key}` as FieldKey,
   );
+  const textFields: readonly FieldKey[] = extraTexts.map(
+    (t) => `text:${t.key}` as FieldKey,
+  );
   const FIELDS: readonly FieldKey[] = [
     "type",
     ...(needsNameField ? (["name"] as const) : []),
@@ -149,6 +154,7 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
     ...(supportsFormat ? (["format"] as const) : []),
     ...(def.supportsDisplayMode ? (["display_mode"] as const) : []),
     ...(def.supportsBarStyle ? (["bar_style"] as const) : []),
+    ...textFields,
     ...flagFields,
     ...numFields,
     ...enumFields,
@@ -314,6 +320,28 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
       } as Item["options"];
       onChange({ ...item, options: nextOptions });
       return;
+    }
+
+    if (typeof activeField === "string" && activeField.startsWith("text:")) {
+      const textKey = activeField.slice(5);
+      const optsRec = (item.options as Record<string, unknown> | undefined) ?? {};
+      const current = (optsRec[textKey] as string | undefined) ?? "";
+      if (key.backspace || key.delete) {
+        const next = current.slice(0, -1);
+        const nextOpts: Record<string, unknown> = { ...optsRec };
+        if (next === "") delete nextOpts[textKey];
+        else nextOpts[textKey] = next;
+        onChange({
+          ...item,
+          options: Object.keys(nextOpts).length > 0 ? (nextOpts as Item["options"]) : undefined,
+        });
+        return;
+      }
+      if (!key.ctrl && !key.meta && input.length > 0) {
+        const nextOpts = { ...optsRec, [textKey]: current + input };
+        onChange({ ...item, options: nextOpts as Item["options"] });
+        return;
+      }
     }
 
     if (
@@ -484,6 +512,17 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
           `${marker("bar_style")} bar_style:    ⟨ ${(item.options?.bar_style as string | undefined) ?? "dingbat"} ⟩`,
         )]
       : []),
+    ...extraTexts.map((t) => {
+      const raw = ((item.options as Record<string, unknown> | undefined)?.[t.key] as string | undefined) ?? "";
+      const display = raw === "" && t.placeholder
+        ? `(empty — ${t.placeholder})`
+        : formatTextField(raw);
+      return React.createElement(
+        Text,
+        { key: `text:${t.key}` },
+        `${marker(`text:${t.key}` as FieldKey)} ${t.label}:${" ".repeat(Math.max(1, 14 - t.label.length - 1))}${display}`,
+      );
+    }),
     ...extraFlags.map((f) => {
       const raw = (item.options as Record<string, unknown> | undefined)?.[f.key];
       // Flags may declare a defaultValue so "unset" displays as checked —
@@ -499,7 +538,7 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
     }),
     ...extraNums.map((n) => {
       const val = ((item.options as Record<string, unknown> | undefined)?.[n.key] as number | undefined) ?? n.defaultValue;
-      const hint = n.min === 0 && val === 0 ? " (all)" : "";
+      const hint = n.min === 0 && val === 0 ? (n.zeroHint ?? " (all)") : "";
       return React.createElement(
         Text,
         { key: `num:${n.key}` },

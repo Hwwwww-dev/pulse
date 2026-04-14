@@ -7,6 +7,7 @@ import type { ItemType } from "../../config/schema.ts";
  *  - `nameKey`: which options.* field holds a picker name (tool_name / agent_type / skill_name)
  *  - `extraFlags`: item-specific booleans to toggle (e.g. show_breakdown for *_calls)
  *  - `extraEnums`: secondary enum pickers beyond the primary `format` (e.g. limit_reset_format)
+ *  - `extraTexts`: free-form single-line strings (e.g. custom_command.command)
  */
 export interface ItemTypeDef {
   readonly formats: readonly string[];
@@ -18,6 +19,7 @@ export interface ItemTypeDef {
   readonly extraFlags?: readonly ExtraFlag[];
   readonly extraEnums?: readonly ExtraEnum[];
   readonly extraNums?: readonly ExtraNum[];
+  readonly extraTexts?: readonly ExtraText[];
 }
 
 export const BAR_STYLE_PRESETS = [
@@ -62,6 +64,16 @@ export interface ExtraNum {
   readonly step?: number;
   /** Shift+←/→ step size (default step × 10). */
   readonly bigStep?: number;
+  /** Per-field override for the "(all)" hint rendered when min===0 and val===0. */
+  readonly zeroHint?: string;
+}
+
+export interface ExtraText {
+  readonly label: string;
+  /** Path under item.options.* — a single key */
+  readonly key: string;
+  /** Placeholder shown when the value is empty. */
+  readonly placeholder?: string;
 }
 
 const BREAKDOWN_TOP_N_NUM: ExtraNum = {
@@ -349,7 +361,37 @@ export const ITEM_TYPE_DEFS: Record<ItemType, ItemTypeDef> = {
   clock: { formats: CLOCK_FORMATS, supportsVariant: false },
   text: { formats: [], supportsVariant: false },
   spacer: { formats: [], supportsVariant: false },
-  custom_command: { formats: [], supportsVariant: false },
+  custom_command: {
+    formats: [],
+    supportsVariant: false,
+    extraTexts: [
+      { label: "command", key: "command", placeholder: "e.g. git rev-parse --short HEAD" },
+    ],
+    extraFlags: [
+      { label: "command_trim", key: "command_trim", defaultValue: true },
+    ],
+    extraNums: [
+      {
+        label: "command_timeout_ms",
+        key: "command_timeout_ms",
+        defaultValue: 1000,
+        min: 100,
+        max: 60000,
+        step: 100,
+        bigStep: 1000,
+      },
+      {
+        label: "command_cache_ms",
+        key: "command_cache_ms",
+        defaultValue: 0,
+        min: 0,
+        max: 3600000,
+        step: 100,
+        bigStep: 10000,
+        zeroHint: " (off)",
+      },
+    ],
+  },
   recent_agents: {
     formats: [],
     supportsVariant: false,
