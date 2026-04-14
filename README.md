@@ -13,6 +13,15 @@
 
 ![pulse screenshot](./assets/screenshot.png)
 
+## Features
+
+- **Powerline ribbon** with arrow transitions and an 8-slot palette that auto-maps across themes — a config saved under `minimal` stays readable under `powerline` and vice versa.
+- **Dynamic bars & blink warnings** — `context_usage`, `*_limit` and `context_bar` tint their bar/value/label with a green→yellow→red ramp and pulse when a danger threshold is crossed.
+- **Incremental jsonl cursor** — session counters are accumulated via byte-offset replay, so each one-shot render stays fast even on long transcripts.
+- **Rich activity items** — `token_rate` (sliding window), `recent_tools` / `recent_agents` trail, `todos_progress` snapshot from `TodoWrite`, per-tool / per-agent / per-skill counters with breakdowns.
+- **Searchable TUI editor** with categorized type picker, 24-color palette, live preview, and in-place threshold/blink tuning.
+- **Portable cache** at `~/.pulse/.cache/` — external dashboards can read `general.json` / `sessions/*.json` without re-parsing jsonl.
+
 ## Install
 
 ```bash
@@ -53,7 +62,11 @@ Opens an interactive TUI editor with live preview. Config saved to `~/.pulse/con
 
 </details>
 
-Every item supports `label` / `style` / `margin_*` / `trailing_separator` / `hide_when_empty` and type-specific `options`. Bars (`*_bar`) take `bar_width`, `bar_style`, `auto_color`. Paths (`cwd`, `project_dir`) take `path_mode: basename|tilde|short|full`. See the TUI editor for the full set.
+Every item supports `label` / `style` / `margin_*` / `trailing_separator` / `hide_when_empty` and type-specific `options`. Bars (`*_bar`) take `bar_width`, `bar_style`, `dynamic_color`. Paths (`cwd`, `project_dir`) take `path_mode: basename|tilde|short|full`. See the TUI editor for the full set.
+
+### Styling
+
+`style.color` is a single semantic field: on classic themes (`minimal` / `pastel`) it paints the text foreground; on `powerline` it becomes the slot background, and a paired foreground is resolved from the built-in palette map so configs stay readable across theme switches. Custom hex codes outside the palette pass through literally.
 
 ## Example
 
@@ -64,16 +77,61 @@ Every item supports `label` / `style` / `margin_*` / `trailing_separator` / `hid
   "default_separator": "  ",
   "lines": [{
     "items": [
-      { "id": "m", "type": "model", "style": { "fg": "#C792EA", "bold": true } },
-      { "id": "c", "type": "context_usage", "label": "Ctx:", "options": { "auto_color": true } },
-      { "id": "g", "type": "git_branch", "style": { "fg": "#C3E88D" } },
+      { "id": "m", "type": "model", "style": { "color": "#957FB8", "bold": true } },
+      { "id": "c", "type": "context_usage", "label": "Ctx:", "options": { "dynamic_color": true, "show_bar": true } },
+      { "id": "g", "type": "git_branch", "style": { "color": "#98BB6C" } },
       { "id": "$", "type": "cost", "label": "$", "options": { "format": "usd2" } }
     ]
   }]
 }
 ```
 
-Themes: `minimal` · `pastel` · `powerline`.
+Themes: `minimal` · `pastel` · `powerline` (ribbon with arrow transitions, auto-mapped palette).
+
+## TUI Editor Shortcuts
+
+| Scope | Keys | Action |
+|-------|------|--------|
+| Layout page | `↑↓` / `n` / `d` / `x` | select / new item / duplicate / delete |
+| Layout page | `q` / `r` / `s` | quit / reset / save |
+| Edit modal | `↑↓` | switch field |
+| Edit modal | `←→` / `Shift+←→` | change value / big step |
+| Edit modal | `Space` | toggle boolean · open type picker |
+| Edit modal | `Enter` / `Esc` | save / cancel |
+| Type picker | type to filter · `↑↓` navigate · `Enter` select · `Esc` cancel |
+
+## Development
+
+```bash
+git clone https://github.com/Hwwwww-dev/pulse
+cd pulse
+bun install
+
+bun run typecheck   # tsc --noEmit
+bun test            # 180+ tests, render + UI + cli
+bun run dev         # launch TUI editor against a dummy stdin payload
+bun run build       # bundle dist/pulse.js (bin) + dist/index.js
+```
+
+To iterate against a real Claude Code session, point `statusLine.command` in `~/.claude/settings.json` at your checkout:
+
+```json
+"statusLine": { "type": "command", "command": "bun run --cwd /abs/path/to/pulse src/cli/bin.ts" }
+```
+
+## Architecture
+
+```
+stdin payload ─┐
+               ├─▶ SessionCounters (jsonl incremental cursor)
+jsonl transcript ─┘        │
+                           ▼
+                    PulseSnapshot  ──▶  renderSafe(config)  ──▶  ANSI string
+                           │
+                           └──▶ ~/.pulse/.cache/{general,index,sessions/*}.json
+```
+
+Each Claude Code invocation is a one-shot process. The byte-offset cursor in `~/.pulse/.cache/sessions/<id>.json` keeps re-parse cost proportional to new jsonl lines only, so latency stays flat as sessions grow. External tools can consume the cache files directly — schema is published in `src/core/types.ts`.
 
 ## Environment
 

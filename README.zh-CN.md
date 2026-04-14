@@ -13,6 +13,15 @@
 
 ![pulse 截图](./assets/screenshot.png)
 
+## 特性
+
+- **Powerline ribbon**：带箭头过渡的条带渲染；8 槽调色盘跨主题自动映射——在 `minimal` 下保存的配置切到 `powerline` 仍然可读，反之亦然。
+- **动态进度条与闪烁告警**：`context_usage`、`*_limit`、`context_bar` 按 绿→黄→红 阈值给 bar/label/value 上色，达到危险阈值时脉冲闪烁。
+- **增量 jsonl 游标**：每次一次性渲染只重新解析新增字节，长会话下延迟保持平稳。
+- **丰富的活动条目**：`token_rate`（滑动窗口）、`recent_tools` / `recent_agents` 轨迹、`todos_progress`（`TodoWrite` 快照），以及带明细拆分的工具/Agent/Skill 计数器。
+- **可搜索 TUI 编辑器**：分类类型选择器 + 24 色调色盘 + 实时预览 + 阈值/闪烁 就地调参。
+- **便携缓存** `~/.pulse/.cache/`：外部面板可直接读 `general.json` / `sessions/*.json`，无需重解析 jsonl。
+
 ## 安装
 
 ```bash
@@ -53,7 +62,11 @@ bunx @hwwwww/pulse
 
 </details>
 
-所有条目都支持 `label` / `style` / `margin_*` / `trailing_separator` / `hide_when_empty` 以及类型专属 `options`。进度条（`*_bar`）支持 `bar_width`、`bar_style`、`auto_color`；路径（`cwd`、`project_dir`）支持 `path_mode: basename|tilde|short|full`。完整选项请在 TUI 编辑器中查看。
+所有条目都支持 `label` / `style` / `margin_*` / `trailing_separator` / `hide_when_empty` 以及类型专属 `options`。进度条（`*_bar`）支持 `bar_width`、`bar_style`、`dynamic_color`；路径（`cwd`、`project_dir`）支持 `path_mode: basename|tilde|short|full`。完整选项请在 TUI 编辑器中查看。
+
+### 样式
+
+`style.color` 是一个语义字段：在 classic 主题（`minimal` / `pastel`）下被当作文字前景色；在 `powerline` 下自动映射为槽背景，并从内置调色盘查出配对前景，保证切换主题后配置依然可读。不在调色盘中的自定义 hex 会原样透传。
 
 ## 示例
 
@@ -64,16 +77,61 @@ bunx @hwwwww/pulse
   "default_separator": "  ",
   "lines": [{
     "items": [
-      { "id": "m", "type": "model", "style": { "fg": "#C792EA", "bold": true } },
-      { "id": "c", "type": "context_usage", "label": "Ctx:", "options": { "auto_color": true } },
-      { "id": "g", "type": "git_branch", "style": { "fg": "#C3E88D" } },
+      { "id": "m", "type": "model", "style": { "color": "#957FB8", "bold": true } },
+      { "id": "c", "type": "context_usage", "label": "Ctx:", "options": { "dynamic_color": true, "show_bar": true } },
+      { "id": "g", "type": "git_branch", "style": { "color": "#98BB6C" } },
       { "id": "$", "type": "cost", "label": "$", "options": { "format": "usd2" } }
     ]
   }]
 }
 ```
 
-主题：`minimal` · `pastel` · `powerline`。
+主题：`minimal` · `pastel` · `powerline`（带箭头过渡的 ribbon 渲染，调色盘自动映射）。
+
+## TUI 编辑器快捷键
+
+| 作用域 | 按键 | 行为 |
+|--------|------|------|
+| 布局页 | `↑↓` / `n` / `d` / `x` | 选择 / 新增 / 复制 / 删除条目 |
+| 布局页 | `q` / `r` / `s` | 退出 / 重置 / 保存 |
+| 编辑弹窗 | `↑↓` | 切换字段 |
+| 编辑弹窗 | `←→` / `Shift+←→` | 变更值 / 大步长 |
+| 编辑弹窗 | `Space` | 切换布尔 · 打开类型选择器 |
+| 编辑弹窗 | `Enter` / `Esc` | 保存 / 取消 |
+| 类型选择器 | 直接输入过滤 · `↑↓` 导航 · `Enter` 确认 · `Esc` 取消 |
+
+## 开发
+
+```bash
+git clone https://github.com/Hwwwww-dev/pulse
+cd pulse
+bun install
+
+bun run typecheck   # tsc --noEmit
+bun test            # 180+ 测试，覆盖 render/UI/cli
+bun run dev         # 用 dummy stdin 启动 TUI 编辑器
+bun run build       # 打包 dist/pulse.js (bin) + dist/index.js
+```
+
+如果想对接真实 Claude Code 会话进行本地联调，把 `~/.claude/settings.json` 里的 `statusLine.command` 指向当前仓库即可：
+
+```json
+"statusLine": { "type": "command", "command": "bun run --cwd /abs/path/to/pulse src/cli/bin.ts" }
+```
+
+## 架构
+
+```
+stdin payload ─┐
+               ├─▶ SessionCounters（jsonl 增量游标）
+jsonl transcript ─┘        │
+                           ▼
+                    PulseSnapshot  ──▶  renderSafe(config)  ──▶  ANSI 字符串
+                           │
+                           └──▶ ~/.pulse/.cache/{general,index,sessions/*}.json
+```
+
+每次 Claude Code 调用都是一次性进程。`~/.pulse/.cache/sessions/<id>.json` 里的字节偏移游标让再解析成本只和新增 jsonl 行数成正比，会话再长也不拖延迟。缓存文件结构在 `src/core/types.ts` 中公开声明，外部工具可直接消费。
 
 ## 环境变量
 
