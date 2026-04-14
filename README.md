@@ -1,3 +1,5 @@
+[English](./README.md) | [中文](./README.zh.md)
+
 # pulse
 
 Lightweight, fully-customizable statusline for [Claude Code](https://claude.ai/code).
@@ -248,6 +250,13 @@ Set `theme` in config: `minimal` (default) · `pastel` · `powerline`
 | `PULSE_HOME` | Override base directory (default: `~`) |
 | `NO_COLOR` | Disable all ANSI colors |
 | `COLORTERM` | Set to `truecolor` or `24bit` for full color |
+
+---
+
+## Acknowledgements
+
+- [claude-hud](https://github.com/jarrodwatts/claude-hud) — Claude Code plugin showing context usage, active tools, running agents and todo progress; inspired pulse's item design
+- [ccstatusline](https://github.com/sirmalloc/ccstatusline) — Beautiful, highly customizable statusline with powerline support and themes; inspired pulse's theming and rendering approach
 
 ---
 
