@@ -51,35 +51,47 @@ import { todosProgressRenderer } from "./todos.ts";
 import { tokenRateRenderer } from "./tokenRate.ts";
 
 export type ItemRenderer = (snap: PulseSnapshot, item: Item) => string;
-export type FgOverrideFn = (snap: PulseSnapshot, item: Item) => string | undefined;
+import type { TextStyleInput } from "../ansi.ts";
+export type StyleOverrideFn = (
+  snap: PulseSnapshot,
+  item: Item,
+) => Partial<TextStyleInput> | undefined;
 
-import { thresholdColor } from "./helpers.ts";
+import { subPartStyle } from "./helpers.ts";
 
-function contextFgOverride(snap: PulseSnapshot, item: Item): string | undefined {
-  // Danger is always driven by the "used" percentage so colors stay semantic
-  // (high usage = warning) regardless of display_mode.
-  return thresholdColor(snap.claude.context_window.used_percentage, item);
+// Label-only override: engine consults this to decide whether the item's
+// label should pick up the dynamic_color / blink effects. Value and bar
+// are handled inside their own renderers (see context.ts / limits.ts) so
+// each sub-part can be targeted independently.
+function labelPatchFromPct(item: Item, pct: number): Partial<TextStyleInput> | undefined {
+  const patch = subPartStyle(item, pct, "label");
+  if (!patch.fg && !patch.blink && !patch.bold) return undefined;
+  return patch;
 }
 
-function fiveHourFgOverride(snap: PulseSnapshot, item: Item): string | undefined {
+function contextLabelOverride(snap: PulseSnapshot, item: Item): Partial<TextStyleInput> | undefined {
+  return labelPatchFromPct(item, snap.claude.context_window.used_percentage);
+}
+
+function fiveHourLabelOverride(snap: PulseSnapshot, item: Item): Partial<TextStyleInput> | undefined {
   const used = snap.claude.rate_limits?.five_hour?.used_percentage;
   if (used === undefined) return undefined;
-  return thresholdColor(used, item);
+  return labelPatchFromPct(item, used);
 }
 
-function sevenDayFgOverride(snap: PulseSnapshot, item: Item): string | undefined {
+function sevenDayLabelOverride(snap: PulseSnapshot, item: Item): Partial<TextStyleInput> | undefined {
   const used = snap.claude.rate_limits?.seven_day?.used_percentage;
   if (used === undefined) return undefined;
-  return thresholdColor(used, item);
+  return labelPatchFromPct(item, used);
 }
 
-export const FG_OVERRIDES: Partial<Record<ItemType, FgOverrideFn>> = {
-  context_usage: contextFgOverride,
-  context_bar: contextFgOverride,
-  five_hour_limit: fiveHourFgOverride,
-  five_hour_bar: fiveHourFgOverride,
-  seven_day_limit: sevenDayFgOverride,
-  seven_day_bar: sevenDayFgOverride,
+export const LABEL_STYLE_OVERRIDES: Partial<Record<ItemType, StyleOverrideFn>> = {
+  context_usage: contextLabelOverride,
+  context_bar: contextLabelOverride,
+  five_hour_limit: fiveHourLabelOverride,
+  five_hour_bar: fiveHourLabelOverride,
+  seven_day_limit: sevenDayLabelOverride,
+  seven_day_bar: sevenDayLabelOverride,
 };
 
 export const RENDERERS: Record<ItemType, ItemRenderer> = {

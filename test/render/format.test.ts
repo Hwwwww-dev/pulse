@@ -28,10 +28,24 @@ test("duration_hms", () => {
   expect(formatDuration(3_725_000, "duration_hms")).toBe("1h 2m 5s");
 });
 
+test("duration_hms drops zero units", () => {
+  // exact-hour boundaries shouldn't render "0m 0s"
+  expect(formatDuration(3_600_000, "duration_hms")).toBe("1h");
+  // 1h 0m 5s → "1h 5s" (minutes elided)
+  expect(formatDuration(3_605_000, "duration_hms")).toBe("1h 5s");
+  // 2m 0s → "2m" (seconds elided)
+  expect(formatDuration(120_000, "duration_hms")).toBe("2m");
+});
+
 test("duration_compact", () => {
   expect(formatDuration(45_000, "duration_compact")).toBe("45s");
   expect(formatDuration(125_000, "duration_compact")).toBe("2m05s");
   expect(formatDuration(3_725_000, "duration_compact")).toBe("1h02m");
+});
+
+test("duration_compact drops zero units", () => {
+  expect(formatDuration(3_600_000, "duration_compact")).toBe("1h");
+  expect(formatDuration(120_000, "duration_compact")).toBe("2m");
 });
 
 test("duration_ms", () => {

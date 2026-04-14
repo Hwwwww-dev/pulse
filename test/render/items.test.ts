@@ -308,13 +308,13 @@ test("tool_call with hide_when_empty and zero count returns empty", () => {
   expect(out).toBe("");
 });
 
-test("thresholdColor returns undefined when auto_color is off", () => {
+test("thresholdColor returns undefined when dynamic_color is off", () => {
   const item: Item = { id: "t", type: "context_bar", options: {} };
   expect(thresholdColor(50, item)).toBeUndefined();
 });
 
-test("thresholdColor uses default 20%-step palette ramp when auto_color is on", () => {
-  const mk = (): Item => ({ id: "t", type: "context_bar", options: { auto_color: true } });
+test("thresholdColor uses default 20%-step palette ramp when dynamic_color is on", () => {
+  const mk = (): Item => ({ id: "t", type: "context_bar", options: { dynamic_color: true } });
   // Default ramp pulls from the in-app palette:
   //   0: pastel green, 20: vibrant green,
   //   40: pastel yellow, 60: vibrant yellow, 80: vibrant red
@@ -326,12 +326,12 @@ test("thresholdColor uses default 20%-step palette ramp when auto_color is on", 
   expect(thresholdColor(95, mk())).toBe("#F07178");
 });
 
-test("thresholdColor ignores legacy bar_thresholds even with auto_color on", () => {
+test("thresholdColor ignores legacy bar_thresholds even with dynamic_color on", () => {
   const item: Item = {
     id: "t",
     type: "context_bar",
     options: {
-      auto_color: true,
+      dynamic_color: true,
       bar_thresholds: [
         { at: 0, fg: "#000000" },
         { at: 100, fg: "#ffffff" },

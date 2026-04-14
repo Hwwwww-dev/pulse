@@ -1,7 +1,8 @@
 import type { PulseSnapshot } from "../../core/types.ts";
 import type { Item } from "../../config/schema.ts";
 import { formatNumber, formatRelative, type RelativeFormat } from "../format.ts";
-import { drawBar } from "./helpers.ts";
+import { drawBar, subPartStyle } from "./helpers.ts";
+import { wrapPartial } from "../ansi.ts";
 
 function resolveLimitFormat(item: Item): "percent0" | "percent1" {
   if (item.options?.format === "percent0" || item.options?.format === "percent1") {
@@ -68,7 +69,11 @@ function appendReset(
 ): string {
   if (!item.options?.limit_show_reset) return body;
   const rel = formatRelative(data.reset * 1000, Date.now(), resolveLimitResetFormat(item));
-  return `${body}${partsSep(item)}${rel}`;
+  // reset countdown is its own target so users can independently
+  // blink/color it apart from the percent value (e.g. keep "1h30m"
+  // static while the percent pulses).
+  const resetStyle = subPartStyle(item, data.pct, "reset");
+  return `${body}${partsSep(item)}${wrapPartial(rel, resetStyle)}`;
 }
 
 function displayPct(rawUsed: number, item: Item): number {
@@ -81,9 +86,18 @@ function renderLimit(
   mode: "percent" | "bar",
 ): string {
   const pct = displayPct(data.pct, item);
+  // Danger always computed off raw "used" — semantics stay intuitive
+  // regardless of display_mode flipping to "remaining".
+  const dangerPct = data.pct;
+  const barStyle = subPartStyle(item, dangerPct, "bar");
+  const valStyle = subPartStyle(item, dangerPct, "value");
   const pieces: string[] = [];
-  if (mode === "bar" || item.options?.show_bar) pieces.push(drawBar(pct, item));
-  if (mode === "percent") pieces.push(formatNumber(pct, resolveLimitFormat(item)));
+  if (mode === "bar" || item.options?.show_bar) {
+    pieces.push(wrapPartial(drawBar(pct, item), barStyle));
+  }
+  if (mode === "percent") {
+    pieces.push(wrapPartial(formatNumber(pct, resolveLimitFormat(item)), valStyle));
+  }
   const body = pieces.join(BAR_VALUE_GAP);
   return appendReset(body, item, data);
 }

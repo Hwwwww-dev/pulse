@@ -14,6 +14,33 @@ import { paths } from "../core/paths.ts";
  */
 let loadFellBackToDefaults = false;
 
+/**
+ * In-place rename of deprecated option keys so old configs don't silently
+ * lose their settings to PulseConfigSchema.strip(). Add new entries here
+ * whenever an options field is renamed.
+ */
+function migrateLegacyOptions(raw: unknown): void {
+  if (!raw || typeof raw !== "object") return;
+  const cfg = raw as { lines?: unknown };
+  if (!Array.isArray(cfg.lines)) return;
+  for (const line of cfg.lines) {
+    if (!line || typeof line !== "object") continue;
+    const items = (line as { items?: unknown }).items;
+    if (!Array.isArray(items)) continue;
+    for (const item of items) {
+      if (!item || typeof item !== "object") continue;
+      const opts = (item as { options?: unknown }).options;
+      if (!opts || typeof opts !== "object") continue;
+      const o = opts as Record<string, unknown>;
+      // auto_color → dynamic_color (2026-04 rename)
+      if ("auto_color" in o && !("dynamic_color" in o)) {
+        o.dynamic_color = o.auto_color;
+        delete o.auto_color;
+      }
+    }
+  }
+}
+
 export async function loadConfig(): Promise<PulseConfig> {
   const file = Bun.file(paths.configFile());
   if (!(await file.exists())) {
@@ -22,6 +49,7 @@ export async function loadConfig(): Promise<PulseConfig> {
   }
   try {
     const raw = await file.json();
+    migrateLegacyOptions(raw);
     const parsed = PulseConfigSchema.safeParse(raw);
     if (parsed.success) {
       loadFellBackToDefaults = false;

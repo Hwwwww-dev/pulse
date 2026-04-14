@@ -124,7 +124,7 @@ export const ItemOptionsSchema = z
     bar_thresholds: z.array(BarThresholdSchema).optional().transform((arr) => arr ? arr.slice().sort((a, b) => a.at - b.at) : arr),
     bar_gradient: z.boolean().optional(),
     /** Apply default green→yellow→red threshold ramp when bar_thresholds is unset. */
-    auto_color: z.boolean().optional(),
+    dynamic_color: z.boolean().optional(),
     literal: z.string().optional(),
     git_dirty_marker: z.string().optional(),
     git_show_ahead_behind: z.boolean().optional(),
@@ -214,6 +214,44 @@ export const ItemOptionsSchema = z
     rate_format: z.enum(["per_sec", "per_min"]).optional(),
     /** token_rate: which parts to show — in, out, total */
     rate_parts: z.array(z.enum(["in", "out", "total"])).optional(),
+    /**
+     * Emit a bold + slow-blink SGR when the danger percentage crosses
+     * `blink_at` (default 80). Intended for context_usage / *_limit items
+     * where sustained high usage warrants visual alarm. Terminals that
+     * strip blink fall back to just bold; colour is unaffected.
+     */
+    blink: z.boolean().optional(),
+    /** Danger percentage (0-100) at which `blink` activates. Default 80. */
+    blink_at: z.number().min(0).max(100).optional(),
+    /**
+     * Per-sub-part targeting for `dynamic_color` and `blink`. Each flag
+     * defaults to `true`, so turning on the master switch lights up every
+     * part (label + bar + value). Untoggle a specific flag to exempt that
+     * sub-part. Example: `blink: true, blink_bar: false` makes only label
+     * and percent/reset text pulse while the bar stays static.
+     */
+    color_label: z.boolean().optional(),
+    color_bar: z.boolean().optional(),
+    color_value: z.boolean().optional(),
+    /** *_limit only: reset countdown (e.g. "1h30m"). Default true. */
+    color_reset: z.boolean().optional(),
+    blink_label: z.boolean().optional(),
+    blink_bar: z.boolean().optional(),
+    blink_value: z.boolean().optional(),
+    /** *_limit only: reset countdown (e.g. "1h30m"). Default true. */
+    blink_reset: z.boolean().optional(),
+    /**
+     * Minimum display width (in characters) for the rendered value. Values
+     * shorter than this are right-aligned with leading spaces, stabilising
+     * width as numbers grow/shrink (e.g. cost "$0.10" → "$10.00"). Label,
+     * margins, and ANSI escapes are NOT counted. 0 disables padding.
+     */
+    min_width: z.number().int().min(0).max(40).optional(),
+    /**
+     * Alignment when min_width pads the value: "right" (default, leading
+     * spaces — good for numbers) or "left" (trailing spaces).
+     */
+    min_width_align: z.enum(["left", "right"]).optional(),
   })
   // strip unknown keys instead of rejecting: preserves forward/backward
   // compat when fields are added/removed across pulse versions. Without
@@ -303,7 +341,7 @@ export const defaultConfig: PulseConfig = {
           label_separator: " ",
           options: {
             format: "percent1",
-            auto_color: true,
+            dynamic_color: true,
           },
         },
         { id: "i3", type: "git_branch", label: "", style: { fg: "#C3E88D" } },
@@ -319,7 +357,7 @@ export const defaultConfig: PulseConfig = {
             bar_width: 10,
             limit_show_reset: true,
             limit_reset_format: "relative_eta_compact",
-            auto_color: true,
+            dynamic_color: true,
           },
         },
       ],
@@ -347,7 +385,7 @@ export const defaultConfig: PulseConfig = {
             bar_width: 10,
             limit_show_reset: true,
             limit_reset_format: "relative_eta_long_compact",
-            auto_color: true,
+            dynamic_color: true,
           },
         },
         {

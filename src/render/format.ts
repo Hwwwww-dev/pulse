@@ -75,13 +75,17 @@ export function formatDuration(ms: number, fmt: DurationFormat): string {
   const m = Math.floor((totalSec % 3600) / 60);
   const s = totalSec % 60;
   if (fmt === "duration_hms") {
-    if (h > 0) return `${h}h ${m}m ${s}s`;
-    if (m > 0) return `${m}m ${s}s`;
-    return `${s}s`;
+    // Drop zero-valued units entirely so "1h 0m 5s" → "1h 5s" and exact
+    // boundaries render as "1h" / "2m" instead of "1h 0m 0s".
+    const parts: string[] = [];
+    if (h > 0) parts.push(`${h}h`);
+    if (m > 0) parts.push(`${m}m`);
+    if (s > 0) parts.push(`${s}s`);
+    return parts.length > 0 ? parts.join(" ") : "0s";
   }
-  // duration_compact
-  if (h > 0) return `${h}h${String(m).padStart(2, "0")}m`;
-  if (m > 0) return `${m}m${String(s).padStart(2, "0")}s`;
+  // duration_compact — same zero-skip rule, no padding on omitted units.
+  if (h > 0) return m > 0 ? `${h}h${String(m).padStart(2, "0")}m` : `${h}h`;
+  if (m > 0) return s > 0 ? `${m}m${String(s).padStart(2, "0")}s` : `${m}m`;
   return `${s}s`;
 }
 

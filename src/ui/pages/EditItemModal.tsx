@@ -104,16 +104,19 @@ export function EditItemModal({ item, snapshot, onChange, onClose, onCancel }: E
   const needsNameField = nameOptionKey(item.type) !== null;
   const supportsFormat = def.formats.length > 0;
   const baseFlags = def.extraFlags ?? [];
-  // Items declaring supportsAutoColor get a synthesised auto_color flag so
+  // Items declaring supportsDynamicColor get a synthesised dynamic_color flag so
   // users can opt in to the default green→yellow→red ramp without editing
   // bar_thresholds by hand.
-  const extraFlags = def.supportsAutoColor
-    ? [...baseFlags, { label: "auto_color", key: "auto_color" }]
+  const allExtraFlags = def.supportsDynamicColor
+    ? [{ label: "dynamic_color", key: "dynamic_color" } as const, ...baseFlags]
     : baseFlags;
   const extraEnums = def.extraEnums ?? [];
   const allExtraNums = def.extraNums ?? [];
-  // Nums gated by a requiresFlag only surface when that flag is truthy.
+  // Flags/Nums gated by a requiresFlag only surface when that flag is truthy.
   const opts = (item.options as Record<string, unknown> | undefined) ?? {};
+  const extraFlags = allExtraFlags.filter(
+    (f) => !("requiresFlag" in f) || !f.requiresFlag || Boolean(opts[f.requiresFlag]),
+  );
   const extraNums = allExtraNums.filter(
     (n) => !n.requiresFlag || Boolean(opts[n.requiresFlag]),
   );
@@ -255,7 +258,10 @@ export function EditItemModal({ item, snapshot, onChange, onClose, onCancel }: E
 
     if (typeof activeField === "string" && activeField.startsWith("flag:") && input === " ") {
       const flagKey = activeField.slice(5);
-      const cur = (item.options as Record<string, unknown> | undefined)?.[flagKey];
+      const raw = (item.options as Record<string, unknown> | undefined)?.[flagKey];
+      const flagDef = allExtraFlags.find((f) => f.key === flagKey);
+      const dflt = flagDef && "defaultValue" in flagDef ? Boolean(flagDef.defaultValue) : false;
+      const cur = raw === undefined ? dflt : Boolean(raw);
       const nextOptions = {
         ...(item.options ?? {}),
         [flagKey]: !cur,
@@ -435,7 +441,12 @@ export function EditItemModal({ item, snapshot, onChange, onClose, onCancel }: E
         )]
       : []),
     ...extraFlags.map((f) => {
-      const val = (item.options as Record<string, unknown> | undefined)?.[f.key];
+      const raw = (item.options as Record<string, unknown> | undefined)?.[f.key];
+      // Flags may declare a defaultValue so "unset" displays as checked —
+      // lets target toggles (color_bar etc.) start as "on" when the user
+      // first opens the editor, matching runtime semantics.
+      const dflt = "defaultValue" in f ? Boolean(f.defaultValue) : false;
+      const val = raw === undefined ? dflt : Boolean(raw);
       return React.createElement(
         Text,
         { key: `flag:${f.key}` },

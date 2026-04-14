@@ -7,6 +7,14 @@ export interface TextStyleInput {
   italic?: boolean;
   underline?: boolean;
   dim?: boolean;
+  /**
+   * Slow-blink SGR (\x1b[5m). Paired with `reverse` for a highlighted
+   * flashing block — more visible than plain blink on most terminals.
+   */
+  blink?: boolean;
+  /** Reverse-video SGR (\x1b[7m). Swaps fg and bg to fill a character
+   * block with the current color — used to amplify blink visibility. */
+  reverse?: boolean;
 }
 
 const NAMED_FG: Record<string, number> = {
@@ -91,7 +99,8 @@ export function bgCode(color: string, level: ColorLevel): string {
 // clears line bg). Multi-param form `\x1b[22;23;24;27;39;49m` is valid ANSI but
 // trips Ink's text parser (drops digits, leaks trailing `m`); split sequences
 // are universally safe.
-const RESET_SEQ = "\x1b[22m\x1b[23m\x1b[24m\x1b[27m\x1b[39m\x1b[49m";
+// Includes blink-off (\x1b[25m) so glow effects don't leak into adjacent items.
+const RESET_SEQ = "\x1b[22m\x1b[23m\x1b[24m\x1b[25m\x1b[27m\x1b[39m\x1b[49m";
 
 // P1-3: Use direct string concat instead of array join
 export function applyStyle(text: string, style: TextStyleInput | undefined): string {
@@ -103,6 +112,8 @@ export function applyStyle(text: string, style: TextStyleInput | undefined): str
   if (style.dim) prefix += "\x1b[2m";
   if (style.italic) prefix += "\x1b[3m";
   if (style.underline) prefix += "\x1b[4m";
+  if (style.blink) prefix += "\x1b[5m";
+  if (style.reverse) prefix += "\x1b[7m";
   if (style.fg) prefix += fgCode(style.fg, level);
   if (style.bg) prefix += bgCode(style.bg, level);
   if (!prefix) return text;
@@ -114,6 +125,38 @@ export function applyBg(text: string, bg: string | undefined): string {
   const level = detectColorLevel();
   if (level === "none") return text;
   return `${bgCode(bg, level)}${text}\x1b[49m`;
+}
+
+/**
+ * Wrap a substring with nesting-safe SGR toggles. Unlike applyStyle (which
+ * emits a hard reset), this emits just the specific attribute on/off pair
+ * so outer styling survives inner blocks. Intended for renderers that
+ * style individual sub-parts (e.g. bar vs value vs reset-countdown) while
+ * the engine is still free to apply label/whole-item styling around them.
+ */
+export function wrapPartial(text: string, patch: Partial<TextStyleInput>): string {
+  const level = detectColorLevel();
+  if (level === "none") return text;
+  let prefix = "";
+  let suffix = "";
+  if (patch.bold) {
+    prefix += "\x1b[1m";
+    suffix = "\x1b[22m" + suffix;
+  }
+  if (patch.blink) {
+    prefix += "\x1b[5m";
+    suffix = "\x1b[25m" + suffix;
+  }
+  if (patch.reverse) {
+    prefix += "\x1b[7m";
+    suffix = "\x1b[27m" + suffix;
+  }
+  if (patch.fg) {
+    prefix += fgCode(patch.fg, level);
+    suffix = "\x1b[39m" + suffix;
+  }
+  if (!prefix) return text;
+  return `${prefix}${text}${suffix}`;
 }
 
 // P1-3: Hoist ANSI regex to module level

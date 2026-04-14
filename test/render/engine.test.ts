@@ -89,6 +89,175 @@ test("renderer error produces ? placeholder", () => {
   expect(out).toContain("?");
 });
 
+test("blink emits slow-blink+bold (foreground-only, no reverse)", () => {
+  const config = {
+    ...defaultConfig,
+    lines: [
+      {
+        items: [
+          {
+            id: "a",
+            type: "context_usage" as const,
+            options: { format: "percent0" as const, blink: true, blink_at: 20 },
+          },
+        ],
+      },
+    ],
+  };
+  const out = renderSafe(snap, config);
+  expect(out).toContain("\x1b[5m"); // slow-blink (fg pulse per ECMA-48)
+  expect(out).toContain("\x1b[1m"); // bold fallback
+  expect(out).not.toContain("\x1b[7m"); // never reverse — fills whole cell bg
+});
+
+test("blink_bar: false exempts the bar from blinking", () => {
+  const config = {
+    ...defaultConfig,
+    lines: [
+      {
+        items: [
+          {
+            id: "a",
+            type: "context_usage" as const,
+            options: {
+              format: "percent0" as const,
+              show_bar: true,
+              blink: true,
+              blink_at: 20,
+              blink_bar: false,
+            },
+          },
+        ],
+      },
+    ],
+  };
+  const out = renderSafe(snap, config);
+  // Value sub-part still has blink-on, but the bar itself should NOT
+  // have been wrapped with blink toggles. Hard to assert precisely from
+  // the concatenated SGR stream, so instead verify there are fewer blink
+  // opens than when blink_bar is on.
+  const configFull = {
+    ...config,
+    lines: [
+      {
+        items: [
+          {
+            ...config.lines[0]!.items[0]!,
+            options: { ...config.lines[0]!.items[0]!.options, blink_bar: true },
+          },
+        ],
+      },
+    ],
+  };
+  const outFull = renderSafe(snap, configFull);
+  const cnt = (s: string): number => (s.match(/\x1b\[5m/g) ?? []).length;
+  expect(cnt(outFull)).toBeGreaterThan(cnt(out));
+});
+
+test("blink option emits slow-blink SGR when pct >= blink_at", () => {
+  // full.json: ctx used_percentage = 67. blink_at=20 → should trigger.
+  const config = {
+    ...defaultConfig,
+    lines: [
+      {
+        items: [
+          {
+            id: "a",
+            type: "context_usage" as const,
+            options: { format: "percent0" as const, blink: true, blink_at: 20 },
+          },
+        ],
+      },
+    ],
+  };
+  const out = renderSafe(snap, config);
+  expect(out).toContain("\x1b[5m"); // slow-blink SGR
+  expect(out).toContain("\x1b[1m"); // bold paired with blink
+});
+
+test("blink option below threshold does nothing", () => {
+  // ctx 67 < blink_at 90
+  const config = {
+    ...defaultConfig,
+    lines: [
+      {
+        items: [
+          {
+            id: "a",
+            type: "context_usage" as const,
+            options: { format: "percent0" as const, blink: true, blink_at: 90 },
+          },
+        ],
+      },
+    ],
+  };
+  const out = renderSafe(snap, config);
+  expect(out).not.toContain("\x1b[5m");
+});
+
+test("blink applies to session/weekly limits", () => {
+  // 5h used = 23.5, 7d used = 41.2. blink_at 20 hits both.
+  const config = {
+    ...defaultConfig,
+    lines: [
+      {
+        items: [
+          {
+            id: "a",
+            type: "five_hour_limit" as const,
+            options: { format: "percent0" as const, blink: true, blink_at: 20 },
+          },
+          {
+            id: "b",
+            type: "seven_day_limit" as const,
+            options: { format: "percent0" as const, blink: true, blink_at: 20 },
+          },
+        ],
+      },
+    ],
+  };
+  const out = renderSafe(snap, config);
+  // At least 2 blink SGRs (one per item)
+  const count = (out.match(/\x1b\[5m/g) ?? []).length;
+  expect(count).toBeGreaterThanOrEqual(2);
+});
+
+test("auto min_width pads numeric items by default", () => {
+  // cost usd2 pads to 6 chars ("$99.99"), tokens_compact pads to 5 chars.
+  const config = {
+    ...defaultConfig,
+    lines: [
+      {
+        separator: "|",
+        items: [
+          { id: "a", type: "cost" as const, options: { format: "usd2" as const } },
+          { id: "b", type: "tokens_input" as const },
+        ],
+      },
+    ],
+  };
+  const out = stripAnsi(renderSafe(snap, config));
+  // Expect right-aligned padding
+  const [costStr, tokStr] = out.split("|") as [string, string];
+  expect(costStr.length).toBeGreaterThanOrEqual(6);
+  expect(tokStr.length).toBeGreaterThanOrEqual(5);
+});
+
+test("explicit min_width: 0 opts out of auto padding", () => {
+  const config = {
+    ...defaultConfig,
+    lines: [
+      {
+        items: [
+          { id: "a", type: "cost" as const, options: { format: "usd2" as const, min_width: 0 } },
+        ],
+      },
+    ],
+  };
+  const out = stripAnsi(renderSafe(snap, config));
+  expect(out.startsWith(" ")).toBe(false);
+});
+
 test("hide_when_empty skips empty value", () => {
   const config = {
     ...defaultConfig,

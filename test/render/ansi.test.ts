@@ -12,7 +12,7 @@ beforeEach(() => {
 test("applyStyle truecolor fg hex", () => {
   const out = applyStyle("hi", { fg: "#FFCB6B" });
   expect(out.startsWith("\x1b[38;2;255;203;107m")).toBe(true);
-  expect(out.endsWith("\x1b[22m\x1b[23m\x1b[24m\x1b[27m\x1b[39m\x1b[49m")).toBe(true);
+  expect(out.endsWith("\x1b[22m\x1b[23m\x1b[24m\x1b[25m\x1b[27m\x1b[39m\x1b[49m")).toBe(true);
   expect(stripAnsi(out)).toBe("hi");
 });
 
@@ -22,6 +22,12 @@ test("applyStyle with bold italic underline dim", () => {
   expect(out).toContain("\x1b[3m");
   expect(out).toContain("\x1b[4m");
   expect(out).toContain("\x1b[2m");
+});
+
+test("applyStyle emits blink SGR for glow effect", () => {
+  const out = applyStyle("x", { bold: true, blink: true, fg: "#F07178" });
+  expect(out).toContain("\x1b[5m"); // slow-blink
+  expect(out).toContain("\x1b[1m"); // bold
 });
 
 test("named colors resolve to basic SGR", () => {

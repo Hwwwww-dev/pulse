@@ -1,7 +1,8 @@
 import type { PulseSnapshot } from "../../core/types.ts";
 import type { Item } from "../../config/schema.ts";
 import { formatNumber, formatTokens } from "../format.ts";
-import { drawBar } from "./helpers.ts";
+import { drawBar, subPartStyle } from "./helpers.ts";
+import { wrapPartial } from "../ansi.ts";
 
 function resolveContextFormat(item: Item): "percent0" | "percent1" {
   const f = item.options?.format;
@@ -22,16 +23,23 @@ function resolvePct(rawUsed: number, item: Item): number {
 export const contextUsageRenderer = (snap: PulseSnapshot, item: Item): string => {
   const used = snap.claude.context_window.used_percentage;
   const pct = resolvePct(used, item);
+  // danger pct drives both color ramp and blink threshold; always based on
+  // raw "used" so semantics stay intuitive regardless of display_mode.
+  const dangerPct = used;
+  const barStyle = subPartStyle(item, dangerPct, "bar");
+  const valStyle = subPartStyle(item, dangerPct, "value");
   const pieces: string[] = [];
-  if (item.options?.show_bar) pieces.push(drawBar(pct, item));
+  if (item.options?.show_bar) pieces.push(wrapPartial(drawBar(pct, item), barStyle));
+  let valueText: string;
   if (item.options?.ctx_show_absolute) {
     const size = snap.claude.context_window.context_window_size;
     const abs = Math.round((size * pct) / 100);
     const absFmt = item.options?.ctx_absolute_format ?? "tokens_compact";
-    pieces.push(formatTokens(abs, absFmt));
+    valueText = formatTokens(abs, absFmt);
   } else {
-    pieces.push(formatNumber(pct, resolveContextFormat(item)));
+    valueText = formatNumber(pct, resolveContextFormat(item));
   }
+  pieces.push(wrapPartial(valueText, valStyle));
   // Bar↔value gap is HARDCODED at 2 spaces. parts_separator does NOT
   // affect bars — they always need a visible gap before adjacent text.
   return pieces.join("  ");
@@ -39,7 +47,8 @@ export const contextUsageRenderer = (snap: PulseSnapshot, item: Item): string =>
 
 export const contextBarRenderer = (snap: PulseSnapshot, item: Item): string => {
   const used = snap.claude.context_window.used_percentage;
-  return drawBar(resolvePct(used, item), item);
+  const barStyle = subPartStyle(item, used, "bar");
+  return wrapPartial(drawBar(resolvePct(used, item), item), barStyle);
 };
 
 // Resolve the effective session total for each token dimension as

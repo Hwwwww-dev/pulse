@@ -34,8 +34,18 @@ function breakdownOpts(item: Item): { n: number; max: number } {
   };
 }
 
+// Zero-valued counters collapse to empty unless the user explicitly opts back
+// in via hide_when_empty=false. Rationale: when a capability was never used
+// in a session (e.g. no agents dispatched), showing "0" is pure noise and
+// competes for statusline real estate with data that matters. Users who want
+// the constant "0" sentinel can override per-item.
+function hideZero(item: Item): boolean {
+  return item.hide_when_empty !== false;
+}
+
 export const toolCallsRenderer = (snap: PulseSnapshot, item: Item): string => {
   const total = snap.counters.tool_calls_total;
+  if (total === 0 && hideZero(item)) return "";
   if (!item.options?.show_breakdown) return String(total);
   const { n, max } = breakdownOpts(item);
   return `${total}${partsSep(item)}(${breakdown(snap.counters.tool_calls_by_name, n, max)})`;
@@ -43,6 +53,7 @@ export const toolCallsRenderer = (snap: PulseSnapshot, item: Item): string => {
 
 export const agentCallsRenderer = (snap: PulseSnapshot, item: Item): string => {
   const total = snap.counters.agent_calls_total;
+  if (total === 0 && hideZero(item)) return "";
   if (!item.options?.show_breakdown) return String(total);
   const { n, max } = breakdownOpts(item);
   return `${total}${partsSep(item)}(${breakdown(snap.counters.agent_calls_by_type, n, max)})`;
@@ -50,6 +61,7 @@ export const agentCallsRenderer = (snap: PulseSnapshot, item: Item): string => {
 
 export const skillCallsRenderer = (snap: PulseSnapshot, item: Item): string => {
   const total = snap.counters.skill_calls_total;
+  if (total === 0 && hideZero(item)) return "";
   if (!item.options?.show_breakdown) return String(total);
   const { n, max } = breakdownOpts(item);
   return `${total}${partsSep(item)}(${breakdown(snap.counters.skill_calls_by_name, n, max)})`;

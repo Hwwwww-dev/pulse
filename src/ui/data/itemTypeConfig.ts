@@ -11,7 +11,7 @@ import type { ItemType } from "../../config/schema.ts";
 export interface ItemTypeDef {
   readonly formats: readonly string[];
   readonly supportsVariant: boolean;
-  readonly supportsAutoColor?: boolean;
+  readonly supportsDynamicColor?: boolean;
   readonly supportsDisplayMode?: boolean;
   readonly supportsBarStyle?: boolean;
   readonly nameKey?: "tool_name" | "agent_type" | "skill_name";
@@ -35,6 +35,10 @@ export interface ExtraFlag {
   readonly label: string;
   /** Path under item.options.* — a single key */
   readonly key: string;
+  /** Only shown when this boolean flag under options is truthy. */
+  readonly requiresFlag?: string;
+  /** Treat an unset options[key] as this boolean when rendering & toggling. */
+  readonly defaultValue?: boolean;
 }
 
 export interface ExtraEnum {
@@ -79,6 +83,72 @@ const BREAKDOWN_MAX_CHARS_NUM: ExtraNum = {
   step: 10,
   bigStep: 50,
 };
+
+// Danger threshold (percentage) at which the blink effect kicks in. Gated
+// on the `blink` flag so it only appears in the editor after the user opts
+// into the behaviour.
+const BLINK_FLAG: ExtraFlag = { label: "blink", key: "blink" };
+const BLINK_AT_NUM: ExtraNum = {
+  label: "blink_at",
+  key: "blink_at",
+  defaultValue: 80,
+  min: 0,
+  max: 100,
+  requiresFlag: "blink",
+  step: 1,
+  bigStep: 5,
+};
+
+// Per-sub-part target toggles. Rendered as child flags under the master
+// switch (dynamic_color / blink); all default to true so simply flipping
+// the master lights up every part.
+const COLOR_LABEL_FLAG: ExtraFlag = {
+  label: "  ↳ dynamic: label", key: "color_label",
+  requiresFlag: "dynamic_color", defaultValue: true,
+};
+const COLOR_BAR_FLAG: ExtraFlag = {
+  label: "  ↳ dynamic: bar", key: "color_bar",
+  requiresFlag: "dynamic_color", defaultValue: true,
+};
+const COLOR_VALUE_FLAG: ExtraFlag = {
+  label: "  ↳ dynamic: value", key: "color_value",
+  requiresFlag: "dynamic_color", defaultValue: true,
+};
+const BLINK_LABEL_FLAG: ExtraFlag = {
+  label: "  ↳ blink: label", key: "blink_label",
+  requiresFlag: "blink", defaultValue: true,
+};
+const BLINK_BAR_FLAG: ExtraFlag = {
+  label: "  ↳ blink: bar", key: "blink_bar",
+  requiresFlag: "blink", defaultValue: true,
+};
+const BLINK_VALUE_FLAG: ExtraFlag = {
+  label: "  ↳ blink: value", key: "blink_value",
+  requiresFlag: "blink", defaultValue: true,
+};
+const COLOR_RESET_FLAG: ExtraFlag = {
+  label: "  ↳ dynamic: reset", key: "color_reset",
+  requiresFlag: "dynamic_color", defaultValue: true,
+};
+const BLINK_RESET_FLAG: ExtraFlag = {
+  label: "  ↳ blink: reset", key: "blink_reset",
+  requiresFlag: "blink", defaultValue: true,
+};
+const COLOR_TARGET_FLAGS: readonly ExtraFlag[] = [
+  COLOR_LABEL_FLAG, COLOR_BAR_FLAG, COLOR_VALUE_FLAG,
+];
+const BLINK_TARGET_FLAGS: readonly ExtraFlag[] = [
+  BLINK_LABEL_FLAG, BLINK_BAR_FLAG, BLINK_VALUE_FLAG,
+];
+// Limit items (five_hour_*, seven_day_*) additionally have a reset
+// countdown sub-part, so they get the extra target flag.
+const LIMIT_COLOR_TARGET_FLAGS: readonly ExtraFlag[] = [
+  ...COLOR_TARGET_FLAGS, COLOR_RESET_FLAG,
+];
+const LIMIT_BLINK_TARGET_FLAGS: readonly ExtraFlag[] = [
+  ...BLINK_TARGET_FLAGS, BLINK_RESET_FLAG,
+];
+
 
 const LIMIT_RESET_FORMATS = [
   "relative_eta_long_compact",
@@ -158,20 +228,26 @@ export const ITEM_TYPE_DEFS: Record<ItemType, ItemTypeDef> = {
   context_usage: {
     formats: PERCENT_FORMATS,
     supportsVariant: true,
-    supportsAutoColor: true,
+    supportsDynamicColor: true,
     supportsDisplayMode: true,
     supportsBarStyle: true,
     extraFlags: [
+      ...COLOR_TARGET_FLAGS,
       { label: "show_bar", key: "show_bar" },
       { label: "show_absolute", key: "ctx_show_absolute" },
+      BLINK_FLAG,
+      ...BLINK_TARGET_FLAGS,
     ],
+    extraNums: [BLINK_AT_NUM],
   },
   context_bar: {
     formats: [],
     supportsVariant: false,
-    supportsAutoColor: true,
+    supportsDynamicColor: true,
     supportsDisplayMode: true,
     supportsBarStyle: true,
+    extraFlags: [...COLOR_TARGET_FLAGS, BLINK_FLAG, ...BLINK_TARGET_FLAGS],
+    extraNums: [BLINK_AT_NUM],
   },
 
   tokens_input: { formats: TOKENS_FORMATS, supportsVariant: true },
@@ -183,44 +259,64 @@ export const ITEM_TYPE_DEFS: Record<ItemType, ItemTypeDef> = {
   five_hour_limit: {
     formats: PERCENT_FORMATS,
     supportsVariant: true,
-    supportsAutoColor: true,
+    supportsDynamicColor: true,
     supportsDisplayMode: true,
     supportsBarStyle: true,
     extraFlags: [
+      ...LIMIT_COLOR_TARGET_FLAGS,
       { label: "show_bar", key: "show_bar" },
       { label: "show_reset", key: "limit_show_reset" },
+      BLINK_FLAG,
+      ...LIMIT_BLINK_TARGET_FLAGS,
     ],
     extraEnums: [LIMIT_RESET_FORMAT_ENUM],
+    extraNums: [BLINK_AT_NUM],
   },
   seven_day_limit: {
     formats: PERCENT_FORMATS,
     supportsVariant: true,
-    supportsAutoColor: true,
+    supportsDynamicColor: true,
     supportsDisplayMode: true,
     supportsBarStyle: true,
     extraFlags: [
+      ...LIMIT_COLOR_TARGET_FLAGS,
       { label: "show_bar", key: "show_bar" },
       { label: "show_reset", key: "limit_show_reset" },
+      BLINK_FLAG,
+      ...LIMIT_BLINK_TARGET_FLAGS,
     ],
     extraEnums: [LIMIT_RESET_FORMAT_ENUM],
+    extraNums: [BLINK_AT_NUM],
   },
   five_hour_bar: {
     formats: [],
     supportsVariant: false,
-    supportsAutoColor: true,
+    supportsDynamicColor: true,
     supportsDisplayMode: true,
     supportsBarStyle: true,
-    extraFlags: [{ label: "show_reset", key: "limit_show_reset" }],
+    extraFlags: [
+      ...LIMIT_COLOR_TARGET_FLAGS,
+      { label: "show_reset", key: "limit_show_reset" },
+      BLINK_FLAG,
+      ...LIMIT_BLINK_TARGET_FLAGS,
+    ],
     extraEnums: [LIMIT_RESET_FORMAT_ENUM],
+    extraNums: [BLINK_AT_NUM],
   },
   seven_day_bar: {
     formats: [],
     supportsVariant: false,
-    supportsAutoColor: true,
+    supportsDynamicColor: true,
     supportsDisplayMode: true,
     supportsBarStyle: true,
-    extraFlags: [{ label: "show_reset", key: "limit_show_reset" }],
+    extraFlags: [
+      ...LIMIT_COLOR_TARGET_FLAGS,
+      { label: "show_reset", key: "limit_show_reset" },
+      BLINK_FLAG,
+      ...LIMIT_BLINK_TARGET_FLAGS,
+    ],
     extraEnums: [LIMIT_RESET_FORMAT_ENUM],
+    extraNums: [BLINK_AT_NUM],
   },
   reset_in_5h: { formats: RELATIVE_FORMATS, supportsVariant: true },
   reset_in_7d: { formats: RELATIVE_FORMATS, supportsVariant: true },
