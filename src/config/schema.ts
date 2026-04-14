@@ -46,10 +46,16 @@ export type ItemType = z.infer<typeof ItemTypeSchema>;
 
 const ColorSchema = z.string();
 
+/**
+ * User-facing style for items and labels. Exposes a single semantic
+ * `color` field instead of fg/bg — the render engine decides whether to
+ * paint that color as a foreground (classic themes) or as a background
+ * slot override (powerline), so users don't have to think about
+ * terminal plumbing when editing their bar.
+ */
 export const TextStyleSchema = z
   .object({
-    fg: ColorSchema.optional(),
-    bg: ColorSchema.optional(),
+    color: ColorSchema.optional(),
     bold: z.boolean().optional(),
     italic: z.boolean().optional(),
     underline: z.boolean().optional(),
@@ -95,7 +101,7 @@ export const FormatSchema = z.enum([
 
 const BarThresholdSchema = z.object({
   at: z.number().min(0).max(100),
-  fg: ColorSchema,
+  color: ColorSchema,
 });
 
 export const ItemOptionsSchema = z
@@ -333,68 +339,124 @@ export const defaultConfig: PulseConfig = {
   lines: [
     {
       items: [
-        { id: "i1", type: "model", style: { fg: "#A8A8D7", bold: true } },
         {
-          id: "i2",
+          id: "model",
+          type: "model",
+          label: "Model:",
+          style: { color: "#957FB8", bold: true },
+        },
+        {
+          id: "git_branch",
+          type: "git_branch",
+          label: "Git:",
+          style: { color: "#98BB6C" },
+          trailing_separator: "  ",
+        },
+        {
+          id: "context_usage",
           type: "context_usage",
           label: "Ctx:",
           label_separator: " ",
           options: {
             format: "percent1",
             dynamic_color: true,
+            show_bar: true,
+            ctx_show_absolute: true,
+            blink: true,
+            blink_at: 20,
           },
         },
-        { id: "i3", type: "git_branch", label: "", style: { fg: "#C3E88D" } },
-        { id: "i4", type: "lines_changed", style: { dim: true } },
         {
-          id: "i5",
+          id: "five_hour_limit",
           type: "five_hour_limit",
           label: "Session:",
           label_separator: " ",
           options: {
             format: "percent1",
-            show_bar: true,
             bar_width: 10,
-            limit_show_reset: true,
-            limit_reset_format: "relative_eta_compact",
             dynamic_color: true,
+            limit_show_reset: true,
+            show_bar: true,
+            limit_reset_format: "clock_at_12",
+            blink: true,
+            blink_at: 80,
           },
         },
       ],
     },
     {
       items: [
-        { id: "i6", type: "tokens_input", label: "In:", label_separator: " " },
-        { id: "i7", type: "tokens_output", label: "Out:", label_separator: " " },
-        { id: "i8", type: "tokens_cache_read", label: "Cached:", label_separator: " " },
         {
-          id: "i9",
-          type: "tokens_summary",
-          label: "Total:",
+          id: "tokens_input",
+          type: "tokens_input",
+          label: "In:",
           label_separator: " ",
-          options: { tokens_parts: ["total"] },
+          style: { color: "#E46876" },
         },
         {
-          id: "i10",
-          type: "seven_day_limit",
-          label: "Weekly:",
+          id: "tokens_output",
+          type: "tokens_output",
+          label: "Out:",
           label_separator: " ",
-          options: {
-            format: "percent1",
-            show_bar: true,
-            bar_width: 10,
-            limit_show_reset: true,
-            limit_reset_format: "relative_eta_long_compact",
-            dynamic_color: true,
-          },
+          style: { color: "#7E9CD8" },
         },
         {
-          id: "i11",
+          id: "tokens_cache_read",
+          type: "tokens_cache_read",
+          label: "Cached:",
+          label_separator: " ",
+          style: { color: "#C5B8DF" },
+        },
+        {
+          id: "cost",
           type: "cost",
           label: "Cost:",
           label_separator: " ",
+          style: { color: "#B9C5E6" },
           options: { format: "usd2" },
-          style: { fg: "#FFCB6B" },
+        },
+        {
+          id: "seven_day_limit",
+          type: "seven_day_limit",
+          label: "Weekly:",
+          label_separator: " ",
+          style: { color: "#A29E92" },
+          options: {
+            format: "percent1",
+            bar_width: 10,
+            dynamic_color: false,
+            limit_show_reset: true,
+            show_bar: true,
+            limit_reset_format: "relative_eta_long_compact",
+          },
+        },
+      ],
+    },
+    {
+      items: [
+        {
+          id: "tool_calls",
+          type: "tool_calls",
+          label: "Tools:",
+          style: { color: "#A29E92" },
+          trailing_separator: " ",
+          options: {
+            show_breakdown: true,
+            breakdown_top_n: 5,
+          },
+        },
+      ],
+    },
+    {
+      items: [
+        {
+          id: "recent_agents",
+          type: "recent_agents",
+          label: "Agents:",
+          style: { color: "#A29E92" },
+          options: {
+            agents_show_completed: true,
+          },
         },
       ],
     },

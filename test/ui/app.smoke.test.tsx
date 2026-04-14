@@ -39,9 +39,12 @@ test("editing text does not trigger global q/r/s hotkeys and updates preview liv
   await new Promise((r) => setTimeout(r, 100));
 
   const frame = lastFrame() ?? "";
-  expect(frame).toContain('label:        "qrs"');
+  // Default config's first item starts with label "Model:"; typing qrs
+  // appends, so the edited label is "Model:qrs" — verifying both that
+  // text input flowed through and that q/r/s didn't trip global hotkeys.
+  expect(frame).toContain('label:        "Model:qrs"');
   // Strip ANSI before checking label+value adjacency (label and value now styled separately)
-  expect(stripAnsi(frame)).toContain("qrs Opus");
+  expect(stripAnsi(frame)).toContain("Model:qrs Opus");
   expect(frame).toContain("Pulse");
 
   unmount();

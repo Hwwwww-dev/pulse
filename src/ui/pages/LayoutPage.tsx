@@ -113,6 +113,7 @@ export function LayoutPage({ config, snapshot, onChange, onEditingChange }: Layo
       return React.createElement(EditItemModal, {
         item: currentItem,
         snapshot,
+        theme: config.theme,
         onChange: (next) => onChange(replaceItem(config, cursor, next)),
         onClose: () => {
           setEditing(false);

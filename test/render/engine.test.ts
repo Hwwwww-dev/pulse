@@ -331,8 +331,8 @@ test("label_style colors label independently from value", () => {
             type: "text" as const,
             label: "X:",
             options: { literal: "val" },
-            style: { fg: "red" },
-            label_style: { fg: "blue", dim: true },
+            style: { color: "red" },
+            label_style: { color: "blue", dim: true },
           },
         ],
       },
@@ -345,4 +345,56 @@ test("label_style colors label independently from value", () => {
   expect(out).toContain("\x1b[2m"); // dim
   // Red value
   expect(out).toContain("\x1b[31m"); // red fg
+});
+
+test("powerline theme renders arrow transitions and an end cap", () => {
+  const config = {
+    ...defaultConfig,
+    theme: "powerline",
+    lines: [
+      {
+        items: [
+          { id: "a", type: "model" as const },
+          { id: "b", type: "version" as const },
+          { id: "c", type: "cwd" as const },
+        ],
+      },
+    ],
+  };
+  const out = renderSafe(snap, config);
+  // Visible glyphs survive ANSI stripping: three item values + three arrows
+  // (one transition between adjacent pairs + the closing cap).
+  const plain = stripAnsi(out);
+  const arrowCount = (plain.match(/\ue0b0/g) ?? []).length;
+  expect(arrowCount).toBe(3);
+  // Item texts still show up in the output.
+  expect(plain).toContain("Opus");
+  expect(plain).toContain("2.1.90");
+  // Slot palette colors appear as 24-bit bg codes (first two palette entries).
+  expect(out).toContain("\x1b[48;2;176;83;96m");  // #B05360 dusty red
+  expect(out).toContain("\x1b[48;2;184;121;45m"); // #B8792D honey amber
+  // End cap resets bg to default so the ribbon closes cleanly.
+  expect(out).toContain("\x1b[49m");
+});
+
+test("powerline mode skips arrow path when color support is disabled", () => {
+  (Bun.env as Record<string, string>).NO_COLOR = "1";
+  resetLevel();
+  const config = {
+    ...defaultConfig,
+    theme: "powerline",
+    lines: [
+      {
+        items: [
+          { id: "a", type: "model" as const },
+          { id: "b", type: "version" as const },
+        ],
+      },
+    ],
+  };
+  const out = renderSafe(snap, config);
+  // No color → no arrows, plain join under the default separator.
+  expect(out).not.toContain("\ue0b0");
+  expect(out).toContain("Opus");
+  expect(out).toContain("2.1.90");
 });

@@ -333,8 +333,8 @@ test("thresholdColor ignores legacy bar_thresholds even with dynamic_color on", 
     options: {
       dynamic_color: true,
       bar_thresholds: [
-        { at: 0, fg: "#000000" },
-        { at: 100, fg: "#ffffff" },
+        { at: 0, color: "#000000" },
+        { at: 100, color: "#ffffff" },
       ],
     },
   };

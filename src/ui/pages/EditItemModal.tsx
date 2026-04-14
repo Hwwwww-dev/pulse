@@ -12,6 +12,9 @@ import { TypePickerModal } from "./TypePickerModal.tsx";
 export interface EditItemModalProps {
   item: Item;
   snapshot: PulseSnapshot;
+  /** Current theme name — determines whether the ColorPicker edits
+   * `style.fg` (classic themes) or `style.bg` (powerline). */
+  theme?: string;
   onChange: (next: Item) => void;
   onClose: () => void;
   onCancel: () => void;
@@ -29,7 +32,7 @@ type FieldKey =
   | "bar_style"
   | "margin_left"
   | "margin_right"
-  | "fg"
+  | "color"
   | `flag:${string}`
   | `enum:${string}`
   | `num:${string}`;
@@ -100,8 +103,14 @@ function initialFocusFieldIndex(fields: readonly FieldKey[]): number {
   return 0;
 }
 
-export function EditItemModal({ item, snapshot, onChange, onClose, onCancel }: EditItemModalProps): React.ReactElement {
+export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose, onCancel }: EditItemModalProps): React.ReactElement {
   const def = defForType(item.type);
+  // Items store a single semantic `color` field — the render engine
+  // decides whether it lands as foreground (classic themes) or as a
+  // background slot override (powerline) at paint time. The picker
+  // label stays `color` everywhere so users don't have to track the
+  // theme-dependent meaning.
+  const pickerLabel = "color";
   const needsNameField = nameOptionKey(item.type) !== null;
   const supportsFormat = def.formats.length > 0;
   const baseFlags = def.extraFlags ?? [];
@@ -145,7 +154,7 @@ export function EditItemModal({ item, snapshot, onChange, onClose, onCancel }: E
     ...enumFields,
     "margin_left",
     "margin_right",
-    "fg",
+    "color",
   ];
 
   const [focus, setFocus] = useState<number>(() => initialFocusFieldIndex(FIELDS));
@@ -231,14 +240,14 @@ export function EditItemModal({ item, snapshot, onChange, onClose, onCancel }: E
       }
     }
 
-    if (activeField === "fg") {
+    if (activeField === "color") {
       if (key.leftArrow || key.rightArrow) {
-        const cur = item.style?.fg;
+        const cur = item.style?.color;
         const idx = cur ? PALETTE.indexOf(cur) : -1;
         const nextIdx = key.rightArrow
           ? (idx + 1) % PALETTE.length
           : (idx - 1 + PALETTE.length) % PALETTE.length;
-        onChange({ ...item, style: { ...(item.style ?? {}), fg: PALETTE[nextIdx]! } });
+        onChange({ ...item, style: { ...(item.style ?? {}), color: PALETTE[nextIdx]! } });
         return;
       }
     }
@@ -517,11 +526,13 @@ export function EditItemModal({ item, snapshot, onChange, onClose, onCancel }: E
     ),
     React.createElement(
       Box,
-      { key: "fg" },
-      React.createElement(Text, null, `${marker("fg")} `),
+      { key: "color" },
+      React.createElement(Text, null, `${marker("color")} `),
       React.createElement(ColorPicker, {
-        value: item.style?.fg,
-        onChange: (c) => onChange({ ...item, style: { ...(item.style ?? {}), fg: c } }),
+        label: pickerLabel,
+        value: item.style?.color,
+        onChange: (c) =>
+          onChange({ ...item, style: { ...(item.style ?? {}), color: c } }),
       }),
     ),
     React.createElement(

@@ -310,11 +310,16 @@ export interface CacheIndexFile {
 // TextStyle (referenced by spec §5)
 // -----------------------------------------------------------
 
+/**
+ * User-facing style. See schema.ts TextStyleSchema — we expose a
+ * single semantic `color` field instead of splitting fg/bg; the render
+ * engine maps it to fg (classic themes) or bg (powerline) at draw
+ * time, so user config stays portable across themes.
+ */
 export interface TextStyle {
-  fg?: string;
-  bg?: string;
-  bold?: boolean;
-  italic?: boolean;
-  underline?: boolean;
-  dim?: boolean;
+  color?: string | undefined;
+  bold?: boolean | undefined;
+  italic?: boolean | undefined;
+  underline?: boolean | undefined;
+  dim?: boolean | undefined;
 }
