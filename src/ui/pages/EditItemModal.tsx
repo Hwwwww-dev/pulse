@@ -273,7 +273,10 @@ export function EditItemModal({ item, snapshot, onChange, onClose, onCancel }: E
       const def2 = extraNums.find((n) => n.key === numKey);
       if (!def2) return;
       const cur = ((item.options as Record<string, unknown> | undefined)?.[numKey] as number | undefined) ?? def2.defaultValue;
-      const delta = key.rightArrow ? 1 : -1;
+      const step = def2.step ?? 1;
+      const bigStep = def2.bigStep ?? step * 10;
+      const magnitude = key.shift ? bigStep : step;
+      const delta = (key.rightArrow ? 1 : -1) * magnitude;
       const next = Math.max(def2.min, Math.min(def2.max, cur + delta));
       const nextOptions = {
         ...(item.options ?? {}),
@@ -485,7 +488,7 @@ export function EditItemModal({ item, snapshot, onChange, onClose, onCancel }: E
     React.createElement(
       Text,
       { key: "help", dimColor: true },
-      " ↑↓ field · type text / ←→ change · Backspace delete · space toggle · [Enter] save · [Esc] cancel",
+      " ↑↓ field · type text / ←→ change · Shift+←→ big step · Backspace delete · space toggle · [Enter] save · [Esc] cancel",
     ),
   );
 

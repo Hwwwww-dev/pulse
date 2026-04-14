@@ -1,37 +1,58 @@
 import type { PulseSnapshot } from "../../core/types.ts";
 import type { Item } from "../../config/schema.ts";
 
-function topN(counts: Record<string, number>, n: number): string {
+const ELLIPSIS = "\u2026";
+
+function breakdown(counts: Record<string, number>, n: number, maxChars: number): string {
   const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
   // n <= 0 means "show all"
   const entries = n <= 0 ? sorted : sorted.slice(0, n);
   // Match recent_tools grouping style: `Name×Count`.
-  return entries.map(([k, v]) => `${k}\u00d7${v}`).join(" ");
+  const pieces = entries.map(([k, v]) => `${k}\u00d7${v}`);
+  const joined = pieces.join(" ");
+  if (maxChars <= 0 || joined.length <= maxChars) return joined;
+  // Truncate at piece boundary; reserve 1 char for the trailing ellipsis.
+  const kept: string[] = [];
+  let len = 0;
+  for (const p of pieces) {
+    const add = kept.length === 0 ? p.length : p.length + 1; // +1 for space
+    if (len + add + ELLIPSIS.length > maxChars) break;
+    kept.push(p);
+    len += add;
+  }
+  return kept.length === 0 ? ELLIPSIS : kept.join(" ") + ELLIPSIS;
 }
 
 function partsSep(item: Item): string {
   return item.options?.parts_separator ?? " ";
 }
 
+function breakdownOpts(item: Item): { n: number; max: number } {
+  return {
+    n: (item.options?.breakdown_top_n as number | undefined) ?? 3,
+    max: (item.options?.breakdown_max_chars as number | undefined) ?? 0,
+  };
+}
+
 export const toolCallsRenderer = (snap: PulseSnapshot, item: Item): string => {
   const total = snap.counters.tool_calls_total;
-  return item.options?.show_breakdown
-    ? `${total}${partsSep(item)}(${topN(snap.counters.tool_calls_by_name, item.options?.breakdown_top_n ?? 3)})`
-    : String(total);
+  if (!item.options?.show_breakdown) return String(total);
+  const { n, max } = breakdownOpts(item);
+  return `${total}${partsSep(item)}(${breakdown(snap.counters.tool_calls_by_name, n, max)})`;
 };
 
 export const agentCallsRenderer = (snap: PulseSnapshot, item: Item): string => {
   const total = snap.counters.agent_calls_total;
-  return item.options?.show_breakdown
-    ? `${total}${partsSep(item)}(${topN(snap.counters.agent_calls_by_type, item.options?.breakdown_top_n ?? 3)})`
-    : String(total);
+  if (!item.options?.show_breakdown) return String(total);
+  const { n, max } = breakdownOpts(item);
+  return `${total}${partsSep(item)}(${breakdown(snap.counters.agent_calls_by_type, n, max)})`;
 };
 
 export const skillCallsRenderer = (snap: PulseSnapshot, item: Item): string => {
   const total = snap.counters.skill_calls_total;
-  return item.options?.show_breakdown
-    ? `${total}${partsSep(item)}(${topN(snap.counters.skill_calls_by_name, item.options?.breakdown_top_n ?? 3)})`
-    : String(total);
+  if (!item.options?.show_breakdown) return String(total);
+  const { n, max } = breakdownOpts(item);
+  return `${total}${partsSep(item)}(${breakdown(snap.counters.skill_calls_by_name, n, max)})`;
 };
 
 export const toolCallRenderer = (snap: PulseSnapshot, item: Item): string => {

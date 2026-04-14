@@ -145,6 +145,8 @@ export const ItemOptionsSchema = z
     show_breakdown: z.boolean().optional(),
     // 0 = show all
     breakdown_top_n: z.number().int().min(0).max(20).optional(),
+    // 0 = no char cap
+    breakdown_max_chars: z.number().int().min(0).max(500).optional(),
     tokens_parts: z
       .array(z.enum(["input", "output", "cache_read", "cache_create", "total"]))
       .optional(),

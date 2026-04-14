@@ -54,6 +54,10 @@ export interface ExtraNum {
   readonly max: number;
   /** Only shown when this boolean flag under options is truthy. */
   readonly requiresFlag?: string;
+  /** Base ←/→ step size (default 1). */
+  readonly step?: number;
+  /** Shift+←/→ step size (default step × 10). */
+  readonly bigStep?: number;
 }
 
 const BREAKDOWN_TOP_N_NUM: ExtraNum = {
@@ -63,6 +67,17 @@ const BREAKDOWN_TOP_N_NUM: ExtraNum = {
   min: 0, // 0 = show all
   max: 20,
   requiresFlag: "show_breakdown",
+};
+
+const BREAKDOWN_MAX_CHARS_NUM: ExtraNum = {
+  label: "breakdown_max_chars",
+  key: "breakdown_max_chars",
+  defaultValue: 0,
+  min: 0, // 0 = no cap
+  max: 200,
+  requiresFlag: "show_breakdown",
+  step: 10,
+  bigStep: 50,
 };
 
 const LIMIT_RESET_FORMATS = [
@@ -214,19 +229,19 @@ export const ITEM_TYPE_DEFS: Record<ItemType, ItemTypeDef> = {
     formats: INTEGER_FORMATS,
     supportsVariant: false,
     extraFlags: [{ label: "show_breakdown", key: "show_breakdown" }],
-    extraNums: [BREAKDOWN_TOP_N_NUM],
+    extraNums: [BREAKDOWN_TOP_N_NUM, BREAKDOWN_MAX_CHARS_NUM],
   },
   agent_calls: {
     formats: INTEGER_FORMATS,
     supportsVariant: false,
     extraFlags: [{ label: "show_breakdown", key: "show_breakdown" }],
-    extraNums: [BREAKDOWN_TOP_N_NUM],
+    extraNums: [BREAKDOWN_TOP_N_NUM, BREAKDOWN_MAX_CHARS_NUM],
   },
   skill_calls: {
     formats: INTEGER_FORMATS,
     supportsVariant: false,
     extraFlags: [{ label: "show_breakdown", key: "show_breakdown" }],
-    extraNums: [BREAKDOWN_TOP_N_NUM],
+    extraNums: [BREAKDOWN_TOP_N_NUM, BREAKDOWN_MAX_CHARS_NUM],
   },
   tool_call: { formats: INTEGER_FORMATS, supportsVariant: false, nameKey: "tool_name" },
 
