@@ -161,9 +161,10 @@ function buildRelativeBody(absSec: number, opts: { long: boolean; compact: boole
   const m = Math.floor((absSec % 3600) / 60);
 
   if (opts.long && d > 0) {
-    // Day-level decomposition: drop trailing zero units.
+    // Day-level decomposition: drop every zero unit (matches duration_hms rule)
+    // so 5d 0h 56m renders as "5d 56m", not "5d 0h 56m".
     const parts: string[] = [`${d}d`];
-    if (h24 > 0 || m > 0) parts.push(`${h24}h`);
+    if (h24 > 0) parts.push(`${h24}h`);
     if (m > 0) parts.push(`${m}m`);
     return parts.join(sep);
   }

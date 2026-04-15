@@ -71,6 +71,23 @@ test("relative_eta and relative_ago", () => {
   expect(formatRelative(now - 120 * 1000, now, "relative_ago")).toBe("2m ago");
 });
 
+test("relative_eta_long drops zero units", () => {
+  const now = 1_000_000_000_000;
+  const day = 86400 * 1000;
+  const hour = 3600 * 1000;
+  const min = 60 * 1000;
+  // 5d 0h 56m → "in 5d 56m" (0h elided)
+  expect(formatRelative(now + 5 * day + 56 * min, now, "relative_eta_long")).toBe("in 5d 56m");
+  // compact variant: "in 5d56m"
+  expect(formatRelative(now + 5 * day + 56 * min, now, "relative_eta_long_compact")).toBe("in 5d56m");
+  // d>0, h>0, m=0 → "in 2d 3h"
+  expect(formatRelative(now + 2 * day + 3 * hour, now, "relative_eta_long")).toBe("in 2d 3h");
+  // exact-day boundary → "in 2d"
+  expect(formatRelative(now + 2 * day, now, "relative_eta_long")).toBe("in 2d");
+  // d>0, h>0, m>0 still renders all three
+  expect(formatRelative(now + 2 * day + 3 * hour + 4 * min, now, "relative_eta_long")).toBe("in 2d 3h 4m");
+});
+
 test("tokens_compact / tokens_full", () => {
   expect(formatTokens(12345, "tokens_compact")).toBe("12.3k");
   expect(formatTokens(1500000, "tokens_compact")).toBe("1.5M");
