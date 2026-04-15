@@ -72,6 +72,16 @@ export interface ExtraNum {
   readonly bigStep?: number;
   /** Per-field override for the "(all)" hint rendered when min===0 and val===0. */
   readonly zeroHint?: string;
+  /**
+   * When set, the value lives at `options[key][arrayIndex]` (not `options[key]`).
+   * On first edit, the array is materialised from `arrayDefaults`. Multiple
+   * sibling ExtraNums may target the same key with different indices to expose
+   * one slot per scalar — used for ramp/threshold tuples.
+   */
+  readonly arrayIndex?: number;
+  readonly arrayDefaults?: readonly number[];
+  /** Clamp to neighbour values to keep the array ascending (used by ramp stops). */
+  readonly enforceAscending?: boolean;
 }
 
 export interface ExtraText {
@@ -155,6 +165,33 @@ const BLINK_RESET_FLAG: ExtraFlag = {
 const COLOR_TARGET_FLAGS: readonly ExtraFlag[] = [
   COLOR_LABEL_FLAG, COLOR_BAR_FLAG, COLOR_VALUE_FLAG,
 ];
+
+// Five movable breakpoints for the dynamic-color ramp. Colors stay fixed
+// (DEFAULT_DANGER_RAMP); the user only shifts the `at` values. Gated on
+// `dynamic_color` so they only surface after opt-in.
+const COLOR_RAMP_DEFAULTS = [0, 20, 40, 60, 80] as const;
+const COLOR_RAMP_LABELS = [
+  "  ↳ stop1 (safe)",
+  "  ↳ stop2 (ok)",
+  "  ↳ stop3 (warn)",
+  "  ↳ stop4 (high)",
+  "  ↳ stop5 (danger)",
+] as const;
+const COLOR_RAMP_STOP_NUMS: readonly ExtraNum[] = COLOR_RAMP_DEFAULTS.map(
+  (dflt, i) => ({
+    label: COLOR_RAMP_LABELS[i]!,
+    key: "color_ramp_stops",
+    defaultValue: dflt,
+    min: 0,
+    max: 100,
+    requiresFlag: "dynamic_color",
+    step: 1,
+    bigStep: 5,
+    arrayIndex: i,
+    arrayDefaults: COLOR_RAMP_DEFAULTS,
+    enforceAscending: true,
+  }),
+);
 const BLINK_TARGET_FLAGS: readonly ExtraFlag[] = [
   BLINK_LABEL_FLAG, BLINK_BAR_FLAG, BLINK_VALUE_FLAG,
 ];
@@ -256,7 +293,7 @@ export const ITEM_TYPE_DEFS: Record<ItemType, ItemTypeDef> = {
       BLINK_FLAG,
       ...BLINK_TARGET_FLAGS,
     ],
-    extraNums: [BLINK_AT_NUM],
+    extraNums: [...COLOR_RAMP_STOP_NUMS, BLINK_AT_NUM],
   },
   context_bar: {
     formats: [],
@@ -265,7 +302,7 @@ export const ITEM_TYPE_DEFS: Record<ItemType, ItemTypeDef> = {
     supportsDisplayMode: true,
     supportsBarStyle: true,
     extraFlags: [...COLOR_TARGET_FLAGS, BLINK_FLAG, ...BLINK_TARGET_FLAGS],
-    extraNums: [BLINK_AT_NUM],
+    extraNums: [...COLOR_RAMP_STOP_NUMS, BLINK_AT_NUM],
   },
 
   tokens_input: { formats: TOKENS_FORMATS, supportsVariant: true },
@@ -288,7 +325,7 @@ export const ITEM_TYPE_DEFS: Record<ItemType, ItemTypeDef> = {
       ...LIMIT_BLINK_TARGET_FLAGS,
     ],
     extraEnums: [LIMIT_RESET_FORMAT_ENUM],
-    extraNums: [BLINK_AT_NUM],
+    extraNums: [...COLOR_RAMP_STOP_NUMS, BLINK_AT_NUM],
   },
   seven_day_limit: {
     formats: PERCENT_FORMATS,
@@ -304,7 +341,7 @@ export const ITEM_TYPE_DEFS: Record<ItemType, ItemTypeDef> = {
       ...LIMIT_BLINK_TARGET_FLAGS,
     ],
     extraEnums: [LIMIT_RESET_FORMAT_ENUM],
-    extraNums: [BLINK_AT_NUM],
+    extraNums: [...COLOR_RAMP_STOP_NUMS, BLINK_AT_NUM],
   },
   five_hour_bar: {
     formats: [],
@@ -319,7 +356,7 @@ export const ITEM_TYPE_DEFS: Record<ItemType, ItemTypeDef> = {
       ...LIMIT_BLINK_TARGET_FLAGS,
     ],
     extraEnums: [LIMIT_RESET_FORMAT_ENUM],
-    extraNums: [BLINK_AT_NUM],
+    extraNums: [...COLOR_RAMP_STOP_NUMS, BLINK_AT_NUM],
   },
   seven_day_bar: {
     formats: [],
@@ -334,7 +371,7 @@ export const ITEM_TYPE_DEFS: Record<ItemType, ItemTypeDef> = {
       ...LIMIT_BLINK_TARGET_FLAGS,
     ],
     extraEnums: [LIMIT_RESET_FORMAT_ENUM],
-    extraNums: [BLINK_AT_NUM],
+    extraNums: [...COLOR_RAMP_STOP_NUMS, BLINK_AT_NUM],
   },
   reset_in_5h: { formats: RELATIVE_FORMATS, supportsVariant: true },
   reset_in_7d: { formats: RELATIVE_FORMATS, supportsVariant: true },

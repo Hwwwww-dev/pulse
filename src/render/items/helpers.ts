@@ -103,12 +103,17 @@ function rampColor(
 }
 
 // Threshold color used by LABEL_STYLE_OVERRIDES and renderer sub-parts.
-// Returns undefined unless `dynamic_color` is on. Ramp is fixed to
-// DEFAULT_DANGER_RAMP (20% granularity).
+// Returns undefined unless `dynamic_color` is on. Colors come from
+// DEFAULT_DANGER_RAMP; if `color_ramp_stops` is set, those breakpoints
+// replace the default `at` values (colors stay fixed).
 export function thresholdColor(dangerPct: number, item: Item): string | undefined {
   if (!item.options?.dynamic_color) return undefined;
   const gradient = item.options?.bar_gradient ?? false;
-  return rampColor(dangerPct, DEFAULT_DANGER_RAMP, gradient);
+  const stops = item.options?.color_ramp_stops;
+  const ramp = stops
+    ? DEFAULT_DANGER_RAMP.map((tier, i) => ({ at: stops[i] ?? tier.at, fg: tier.fg }))
+    : DEFAULT_DANGER_RAMP;
+  return rampColor(dangerPct, ramp, gradient);
 }
 
 export type SubPart = "label" | "bar" | "value" | "reset";

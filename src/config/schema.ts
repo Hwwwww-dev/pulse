@@ -137,6 +137,20 @@ export const ItemOptionsSchema = z
     bar_gradient: z.boolean().optional(),
     /** Apply default green→yellow→red threshold ramp when bar_thresholds is unset. */
     dynamic_color: z.boolean().optional(),
+    /**
+     * Custom breakpoints for the 5-tier dynamic-color ramp. Length must be
+     * exactly 5, ascending, each in [0, 100]. Colors stay fixed
+     * (DEFAULT_DANGER_RAMP); only the `at` values shift. Unset → default
+     * stops [0, 20, 40, 60, 80].
+     */
+    color_ramp_stops: z
+      .array(z.number().min(0).max(100))
+      .length(5)
+      .refine(
+        (arr) => arr.every((v, i) => i === 0 || v >= arr[i - 1]!),
+        { message: "color_ramp_stops must be ascending" },
+      )
+      .optional(),
     literal: z.string().optional(),
     git_dirty_marker: z.string().optional(),
     git_show_ahead_behind: z.boolean().optional(),
