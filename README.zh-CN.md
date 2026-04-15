@@ -3,149 +3,168 @@
 # pulse
 
 [![npm version](https://img.shields.io/npm/v/@hwwwww/pulse?color=crimson&logo=npm)](https://www.npmjs.com/package/@hwwwww/pulse)
-[![npm downloads](https://img.shields.io/npm/dm/@hwwwww/pulse?color=blue&logo=npm)](https://www.npmjs.com/package/@hwwwww/pulse)
 [![license](https://img.shields.io/npm/l/@hwwwww/pulse?color=green)](./LICENSE)
 [![bun](https://img.shields.io/badge/bun-%E2%89%A51.3-black?logo=bun)](https://bun.sh)
-[![typescript](https://img.shields.io/badge/typescript-5.5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![stars](https://img.shields.io/github/stars/Hwwwww-dev/pulse?style=flat&logo=github)](https://github.com/Hwwwww-dev/pulse)
+[![npm downloads](https://img.shields.io/npm/dm/@hwwwww/pulse?color=blue&logo=npm)](https://www.npmjs.com/package/@hwwwww/pulse)
+[![bundle size](https://img.shields.io/bundlephobia/minzip/@hwwwww/pulse?color=orange)](https://bundlephobia.com/package/@hwwwww/pulse)
+[![types](https://img.shields.io/npm/types/@hwwwww/pulse?color=blueviolet)](https://www.npmjs.com/package/@hwwwww/pulse)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](https://github.com/Hwwwww-dev/pulse/pulls)
+[![issues](https://img.shields.io/github/issues/Hwwwww-dev/pulse?logo=github)](https://github.com/Hwwwww-dev/pulse/issues)
+[![last commit](https://img.shields.io/github/last-commit/Hwwwww-dev/pulse?logo=github)](https://github.com/Hwwwww-dev/pulse/commits)
+[![GitHub stars](https://img.shields.io/github/stars/Hwwwww-dev/pulse?style=social)](https://github.com/Hwwwww-dev/pulse/stargazers)
 
-> [Claude Code](https://claude.ai/code) 的轻量级、高度可定制状态栏——模型、上下文、Token、费用、Git、速率限制。
+**让 [Claude Code](https://claude.ai/code) 的状态一目了然。**
+上下文压力、Token 消耗、费用、速率限制、Git 状态——随时可见，随时可感知。
 
 ![pulse 截图](./assets/screenshot.png)
 
-## 特性
+---
 
-- **Powerline ribbon**：带箭头过渡的条带渲染；8 槽调色盘跨主题自动映射——在 `minimal` 下保存的配置切到 `powerline` 仍然可读，反之亦然。
-- **动态进度条与闪烁告警**：`context_usage`、`*_limit`、`context_bar` 按 绿→黄→红 阈值给 bar/label/value 上色，达到危险阈值时脉冲闪烁。
-- **增量 jsonl 游标**：每次一次性渲染只重新解析新增字节，长会话下延迟保持平稳。
-- **丰富的活动条目**：`token_rate`（滑动窗口）、`recent_tools` / `recent_agents` 轨迹、`todos_progress`（`TodoWrite` 快照），以及带明细拆分的工具/Agent/Skill 计数器。
-- **可搜索 TUI 编辑器**：分类类型选择器 + 24 色调色盘 + 实时预览 + 阈值/闪烁 就地调参。
-- **便携缓存** `~/.pulse/.cache/`：外部面板可直接读 `general.json` / `sessions/*.json`，无需重解析 jsonl。
+## ✨ 功能
 
-## 安装
+- **交互式 TUI 编辑器** — 实时预览、颜色选择器、跨行拖拽排序，无需手写 JSON
+- **30+ 条目类型** — 模型、费用、输入/输出/缓存 Token、上下文用量、5小时与每周限额及重置倒计时、最近工具/Agent、Todo 进度、Git 分支、时钟、自定义 Shell 命令、进度条、空白分隔符（[完整列表 →](https://github.com/Hwwwww-dev/pulse)）
+- **动态颜色渐变** — 进度条按阈值从绿→黄→红渐变；阈值每条目可独立配置
+- **14 种进度条样式** — 细线、方块、盲文点阵等，每个条目单独设置
+- **多行布局** — 每行独立背景色，支持丰富字形样式
+- **子部件样式独立控制** — 对同一条目的标签、进度条、数值分别设色
+- **增量 JSONL 游标** — 每次渲染只重解析新增字节，长会话下依然快
+
+---
+
+## 🔒 离线运行
+
+> **Pulse 完全离线运行。** 不发起任何网络请求，无遥测，无需 API Key —— 仅读取 Claude Code 通过 stdin 传入的 JSON payload，以及本机磁盘上 Claude Code 自身的 JSONL 会话记录。
+>
+> ⚠️ **5 小时** 与 **每周** 速率限制数据来源于 stdin payload，仅在 Claude Code 推送新的状态栏 tick 时刷新，可能比 Claude Code 内部实时计数略有延迟。
+
+---
+
+## 🚀 安装
 
 ```bash
-npm i -g @hwwwww/pulse
+bunx @hwwwww/pulse@latest
 ```
 
-## 接入
+无需全局安装，直接通过 `bunx` 运行。如需频繁使用，可全局安装：`bun add -g @hwwwww/pulse`。
 
-在 `~/.claude/settings.json` 中添加一行：
+运行时要求：需安装 **Bun ≥ 1.3** —— 二进制使用 Bun shebang。
 
-```json
-"statusLine": { "type": "command", "command": "bunx @hwwwww/pulse" }
-```
+---
 
-## 配置
+## ⚙️ 接入
 
-```bash
-bunx @hwwwww/pulse
-```
-
-打开交互式 TUI 编辑器，支持实时预览。配置保存在 `~/.pulse/config.json`。
-
-## 条目
-
-<details>
-<summary>30+ 内置条目（点击展开）</summary>
-
-| 分类 | 条目 |
-|------|------|
-| 会话 | `model` `session_name` `session_id` `version` `output_style` `vim_mode` `agent_name` `worktree` |
-| 上下文 & Token | `context_usage` `context_bar` `tokens_input` `tokens_output` `tokens_cache_read` `tokens_cache_create` `tokens_summary` `token_rate` |
-| 费用 & 耗时 | `cost` `duration` `api_duration` |
-| 速率限制 | `five_hour_limit` `seven_day_limit` `five_hour_bar` `seven_day_bar` `reset_in_5h` `reset_in_7d` |
-| Git | `git_branch` `lines_changed` |
-| 工作区 | `cwd` `project_dir` |
-| 计数器 | `tool_calls` `tool_call` `agent_calls` `skill_calls` `recent_tools` `recent_agents` `todos_progress` |
-| 实用 | `clock` `text` `spacer` `custom_command` |
-
-</details>
-
-所有条目都支持 `label` / `style` / `margin_*` / `trailing_separator` / `hide_when_empty` 以及类型专属 `options`。进度条（`*_bar`）支持 `bar_width`、`bar_style`、`dynamic_color`；路径（`cwd`、`project_dir`）支持 `path_mode: basename|tilde|short|full`。完整选项请在 TUI 编辑器中查看。
-
-### 样式
-
-`style.color` 是一个语义字段：在 classic 主题（`minimal` / `pastel`）下被当作文字前景色；在 `powerline` 下自动映射为槽背景，并从内置调色盘查出配对前景，保证切换主题后配置依然可读。不在调色盘中的自定义 hex 会原样透传。
-
-## 示例
+在 `~/.claude/settings.json` 中添加：
 
 ```json
 {
-  "schema_version": 1,
-  "theme": "minimal",
-  "default_separator": "  ",
+  "statusLine": {
+    "type": "command",
+    "command": "bunx @hwwwww/pulse@latest",
+    "padding": 0
+  }
+}
+```
+
+重启 Claude Code，状态栏即刻生效。
+
+---
+
+## 🎨 自定义
+
+无参数运行 `bunx @hwwwww/pulse@latest` 即可打开 TUI 编辑器（已全局安装则可直接运行 `pulse`）：
+
+```bash
+bunx @hwwwww/pulse@latest
+```
+
+配置文件位置：`~/.pulse/config.json`
+
+可直接手动编辑，也可使用应用内编辑器——两者保持同步。TUI 提供实时预览、颜色选择器、阈值调节器，以及跨行条目排序功能。
+
+手写示例：
+
+```json
+{
   "lines": [{
     "items": [
-      { "id": "m", "type": "model", "style": { "color": "#957FB8", "bold": true } },
-      { "id": "c", "type": "context_usage", "label": "Ctx:", "options": { "dynamic_color": true, "show_bar": true } },
-      { "id": "g", "type": "git_branch", "style": { "color": "#98BB6C" } },
-      { "id": "$", "type": "cost", "label": "$", "options": { "format": "usd2" } }
+      { "id": "m", "type": "model",         "style": { "color": "#957FB8", "bold": true } },
+      { "id": "c", "type": "context_usage", "options": { "dynamic_color": true, "show_bar": true } },
+      { "id": "g", "type": "git_branch",    "style": { "color": "#98BB6C" } },
+      { "id": "$", "type": "cost",          "options": { "format": "usd2" } }
     ]
   }]
 }
 ```
 
-主题：`minimal` · `pastel` · `powerline`（带箭头过渡的 ribbon 渲染，调色盘自动映射）。
+---
 
-## TUI 编辑器快捷键
+## 📦 条目类型
 
-| 作用域 | 按键 | 行为 |
-|--------|------|------|
-| 布局页 | `↑↓` / `n` / `d` / `x` | 选择 / 新增 / 复制 / 删除条目 |
-| 布局页 | `q` / `r` / `s` | 退出 / 重置 / 保存 |
-| 编辑弹窗 | `↑↓` | 切换字段 |
-| 编辑弹窗 | `←→` / `Shift+←→` | 变更值 / 大步长 |
-| 编辑弹窗 | `Space` | 切换布尔 · 打开类型选择器 |
-| 编辑弹窗 | `Enter` / `Esc` | 保存 / 取消 |
-| 类型选择器 | 直接输入过滤 · `↑↓` 导航 · `Enter` 确认 · `Esc` 取消 |
+40 个内置条目，按用途分组。可在应用内的类型选择器中添加。
 
-## 开发
+| 分类 | 条目 |
+|---|---|
+| **会话** | `model` · `session_name` · `session_id` · `agent_name` · `output_style` · `vim_mode` · `version` · `clock` |
+| **工作区** | `cwd` · `project_dir` · `worktree` · `git_branch` |
+| **费用与耗时** | `cost` · `duration` · `api_duration` · `lines_changed` |
+| **Token** | `tokens_input` · `tokens_output` · `tokens_cache_read` · `tokens_cache_create` · `tokens_summary` · `token_rate` |
+| **上下文** | `context_usage` · `context_bar` |
+| **速率限制** | `five_hour_limit` · `seven_day_limit` · `five_hour_bar` · `seven_day_bar` · `reset_in_5h` · `reset_in_7d` |
+| **计数器** | `tool_calls` · `agent_calls` · `skill_calls` · `tool_call` |
+| **活动** | `recent_agents` · `recent_tools` · `todos_progress` |
+| **自定义** | `custom_command` · `text` · `spacer` |
+
+每个条目都支持独立的 `style`、`label`、`format`、动态颜色阈值与宽度对齐。完整 schema 见 [`src/config/schema.ts`](./src/config/schema.ts)。
+
+---
+
+## 🛠️ 开发
+
+想为 pulse 增加新条目类型或贡献代码？克隆仓库并本地运行：
 
 ```bash
-git clone https://github.com/Hwwwww-dev/pulse
+git clone https://github.com/Hwwwww-dev/pulse.git
 cd pulse
 bun install
-
-bun run typecheck   # tsc --noEmit
-bun test            # 180+ 测试，覆盖 render/UI/cli
-bun run dev         # 用 dummy stdin 启动 TUI 编辑器
-bun run build       # 打包 dist/pulse.js (bin) + dist/index.js
+bun run dev          # run the editor against your real config
+bun test             # run the test suite
+bun run typecheck    # strict TypeScript check
+bun run build        # produce dist/pulse.js
 ```
 
-如果想对接真实 Claude Code 会话进行本地联调，把 `~/.claude/settings.json` 里的 `statusLine.command` 指向当前仓库即可：
+项目结构：
 
-```json
-"statusLine": { "type": "command", "command": "bun run --cwd /abs/path/to/pulse src/cli/bin.ts" }
-```
+- `src/cli/`      — CLI 入口，渲染模式管道
+- `src/render/`   — 条目渲染器、格式化工具、渲染引擎
+- `src/ui/`       — 基于 Ink 的 TUI 编辑器（页面、组件、Hooks）
+- `src/config/`   — Schema、主题、调色板、持久化
+- `test/`         — Bun 测试套件
 
-## 架构
+欢迎 PR 与 Issue —— 详见[问题追踪](https://github.com/Hwwwww-dev/pulse/issues)。
 
-```
-stdin payload ─┐
-               ├─▶ SessionCounters（jsonl 增量游标）
-jsonl transcript ─┘        │
-                           ▼
-                    PulseSnapshot  ──▶  renderSafe(config)  ──▶  ANSI 字符串
-                           │
-                           └──▶ ~/.pulse/.cache/{general,index,sessions/*}.json
-```
+---
 
-每次 Claude Code 调用都是一次性进程。`~/.pulse/.cache/sessions/<id>.json` 里的字节偏移游标让再解析成本只和新增 jsonl 行数成正比，会话再长也不拖延迟。缓存文件结构在 `src/core/types.ts` 中公开声明，外部工具可直接消费。
+## ⭐ Star 历史
 
-## 环境变量
+[![Star History Chart](https://api.star-history.com/svg?repos=Hwwwww-dev/pulse&type=Date)](https://star-history.com/#Hwwwww-dev/pulse&Date)
 
-| 变量 | 说明 |
-|------|------|
-| `PULSE_HOME` | 覆盖基目录（默认 `~`） |
-| `NO_COLOR` | 禁用 ANSI 颜色 |
-| `COLORTERM=truecolor` | 启用 24 位真彩色 |
+如果 pulse 对你的日常有帮助，欢迎在 GitHub 点一个 ⭐ ，多谢支持！
 
-## 鸣谢
+---
 
-- [claude-hud](https://github.com/jarrodwatts/claude-hud) — 启发了条目设计（上下文、工具、Agent、Todo）
-- [ccstatusline](https://github.com/sirmalloc/ccstatusline) — 启发了主题与渲染思路
+## 🙏 鸣谢
 
-## 许可证
+Pulse 站在巨人的肩膀上构建：
 
-MIT
+- [Claude Code](https://claude.ai/code) —— 本状态栏所服务的智能编码工具
+- [Bun](https://bun.sh) —— 让 pulse 飞快的运行时、打包器与测试框架
+- [Ink](https://github.com/vadimdemedes/ink) —— 命令行交互应用的 React，驱动 TUI 编辑器
+- [Zod](https://zod.dev) —— 配置文件的运行时 schema 校验
+- 灵感来自 [ccstatusline](https://github.com/sirmalloc/ccstatusline) 与 [claude-hud](https://github.com/jarrodwatts/claude-hud) —— 感谢前人铺路
+
+特别感谢每一位提交 Issue、建议条目类型或为本仓库点亮 Star 的朋友。⭐
+
+## 📜 许可证
+
+MIT © [hwwwww](https://github.com/Hwwwww-dev)

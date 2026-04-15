@@ -76,19 +76,19 @@ test("recent_agents: custom separator", () => {
 test("recent_agents: elapsed format seconds", () => {
   const entry: AgentEntry = { id: "x", type: "Foo", start_ts: NOW - 45000, end_ts: NOW };
   const out = render("recent_agents", mkSnap({ agent_entries: [entry] }));
-  expect(out).toBe("Foo 45s");
+  expect(out).toBe("Foo: 45s");
 });
 
 test("recent_agents: elapsed format minutes", () => {
   const entry: AgentEntry = { id: "x", type: "Bar", start_ts: NOW - 90000, end_ts: NOW };
   const out = render("recent_agents", mkSnap({ agent_entries: [entry] }));
-  expect(out).toBe("Bar 1m30s");
+  expect(out).toBe("Bar: 1m30s");
 });
 
 test("recent_agents: elapsed format hours", () => {
   const entry: AgentEntry = { id: "x", type: "Baz", start_ts: NOW - 3660000, end_ts: NOW };
   const out = render("recent_agents", mkSnap({ agent_entries: [entry] }));
-  expect(out).toBe("Baz 1h1m");
+  expect(out).toBe("Baz: 1h01m");
 });
 
 // ─────────────────────── recent_tools ────────────────────────
@@ -285,7 +285,7 @@ test("parts_separator: recent_agents joins entries with custom glue", () => {
     { id: "b", type: "Plan", start_ts: NOW - 8000, end_ts: NOW },
   ];
   const out = render("recent_agents", mkSnap({ agent_entries: entries }), { parts_separator: " ~ " });
-  expect(out).toBe("Explore 5s ~ Plan 8s");
+  expect(out).toBe("Explore: 5s ~ Plan: 8s");
 });
 
 test("parts_separator: recent_agents empty separator concatenates entries", () => {
@@ -294,7 +294,7 @@ test("parts_separator: recent_agents empty separator concatenates entries", () =
     { id: "b", type: "Plan", start_ts: NOW - 8000, end_ts: NOW },
   ];
   const out = render("recent_agents", mkSnap({ agent_entries: entries }), { parts_separator: "" });
-  expect(out).toBe("Explore 5sPlan 8s");
+  expect(out).toBe("Explore: 5sPlan: 8s");
 });
 
 test("parts_separator: recent_tools joins groups with custom glue", () => {
@@ -326,7 +326,7 @@ test("parts_separator: defaults are single space", () => {
     { id: "b", type: "Plan", start_ts: NOW - 8000, end_ts: NOW },
   ];
   const out1 = render("recent_agents", mkSnap({ agent_entries: entries }));
-  expect(out1).toBe("Explore 5s Plan 8s");
+  expect(out1).toBe("Explore: 5s Plan: 8s");
   // recent_tools default = " "
   const out2 = render("recent_tools", mkSnap({
     recent_tools: [

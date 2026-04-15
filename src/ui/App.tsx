@@ -7,6 +7,7 @@ import { LayoutPage } from "./pages/LayoutPage.tsx";
 import { SettingsPage } from "./pages/SettingsPage.tsx";
 import { DiagnosticsPage } from "./pages/DiagnosticsPage.tsx";
 import { HelpPage } from "./pages/HelpPage.tsx";
+import { AboutPage } from "./pages/AboutPage.tsx";
 import type { PulseSnapshot, TodoItem } from "../core/types.ts";
 import { VERSION } from "../version.ts";
 
@@ -199,7 +200,7 @@ function buildMockSnapshot(tick: number): PulseSnapshot {
   };
 }
 
-const PAGES = ["Layout", "Settings", "Diagnostics", "Help"] as const;
+const PAGES = ["Layout", "Settings", "Diagnostics", "Help", "About"] as const;
 type Page = (typeof PAGES)[number];
 
 export function App(): React.ReactElement {
@@ -260,7 +261,9 @@ export function App(): React.ReactElement {
         ? React.createElement(SettingsPage, { config, onChange: setConfig })
         : page === "Diagnostics"
         ? React.createElement(DiagnosticsPage)
-        : React.createElement(HelpPage),
+        : page === "Help"
+        ? React.createElement(HelpPage)
+        : React.createElement(AboutPage),
     ),
     React.createElement(LivePreview, { snapshot: snapshot, config }),
   );

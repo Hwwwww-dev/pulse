@@ -29,13 +29,32 @@ function moveItem(config: PulseConfig, c: Cursor, delta: -1 | 1): { config: Puls
   const line = config.lines[c.lineIdx];
   if (!line) return null;
   const target = c.itemIdx + delta;
-  if (target < 0 || target >= line.items.length) return null;
-  const nextItems = line.items.slice();
-  const [moved] = nextItems.splice(c.itemIdx, 1);
+  // Within-row move
+  if (target >= 0 && target < line.items.length) {
+    const nextItems = line.items.slice();
+    const [moved] = nextItems.splice(c.itemIdx, 1);
+    if (!moved) return null;
+    nextItems.splice(target, 0, moved);
+    const nextLines = config.lines.map((ln, li) => (li === c.lineIdx ? { ...ln, items: nextItems } : ln));
+    return { config: { ...config, lines: nextLines }, cursor: { ...c, itemIdx: target } };
+  }
+  // Cross-row jump: leave current row and insert into adjacent row.
+  const adjLineIdx = c.lineIdx + delta;
+  const adjLine = config.lines[adjLineIdx];
+  if (!adjLine) return null; // first-of-first or last-of-last → no-op
+  const moved = line.items[c.itemIdx];
   if (!moved) return null;
-  nextItems.splice(target, 0, moved);
-  const nextLines = config.lines.map((ln, li) => (li === c.lineIdx ? { ...ln, items: nextItems } : ln));
-  return { config: { ...config, lines: nextLines }, cursor: { ...c, itemIdx: target } };
+  const srcItems = line.items.filter((_, i) => i !== c.itemIdx);
+  // delta=-1 → insert at end of previous row; delta=+1 → insert at start of next row.
+  const insertIdx = delta === -1 ? adjLine.items.length : 0;
+  const dstItems = adjLine.items.slice();
+  dstItems.splice(insertIdx, 0, moved);
+  const nextLines = config.lines.map((ln, li) => {
+    if (li === c.lineIdx) return { ...ln, items: srcItems };
+    if (li === adjLineIdx) return { ...ln, items: dstItems };
+    return ln;
+  });
+  return { config: { ...config, lines: nextLines }, cursor: { lineIdx: adjLineIdx, itemIdx: insertIdx } };
 }
 
 export function LayoutPage({ config, snapshot, onChange, onEditingChange }: LayoutPageProps): React.ReactElement {
@@ -151,7 +170,7 @@ export function LayoutPage({ config, snapshot, onChange, onEditingChange }: Layo
       React.createElement(
         Text,
         { dimColor: true },
-        " ↑↓ navigate · Shift+↑↓ reorder · Enter edit · a add · d delete · n new line",
+        " ↑↓ navigate · Shift+↑↓ reorder (cross-line) · Enter edit · a add · d delete · n new line",
       ),
     ),
   );
