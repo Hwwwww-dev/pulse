@@ -1,7 +1,15 @@
 import type { PulseSnapshot } from "../../core/types.ts";
 import type { Item } from "../../config/schema.ts";
+import { compact } from "../format.ts";
 
 const ELLIPSIS = "\u2026";
+
+// tool_calls/agent_calls/skill_calls/tool_call expose `format` (integer|compact)
+// in the editor; honor it instead of dumping String(total). Default = integer
+// so existing configs render unchanged.
+function fmtCount(item: Item, n: number): string {
+  return item.options?.format === "compact" ? compact(n) : String(Math.trunc(n));
+}
 
 function breakdown(counts: Record<string, number>, n: number, maxChars: number): string {
   const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
@@ -46,25 +54,28 @@ function hideZero(item: Item): boolean {
 export const toolCallsRenderer = (snap: PulseSnapshot, item: Item): string => {
   const total = snap.counters.tool_calls_total;
   if (total === 0 && hideZero(item)) return "";
-  if (!item.options?.show_breakdown) return String(total);
+  const head = fmtCount(item, total);
+  if (!item.options?.show_breakdown) return head;
   const { n, max } = breakdownOpts(item);
-  return `${total}${partsSep(item)}(${breakdown(snap.counters.tool_calls_by_name, n, max)})`;
+  return `${head}${partsSep(item)}(${breakdown(snap.counters.tool_calls_by_name, n, max)})`;
 };
 
 export const agentCallsRenderer = (snap: PulseSnapshot, item: Item): string => {
   const total = snap.counters.agent_calls_total;
   if (total === 0 && hideZero(item)) return "";
-  if (!item.options?.show_breakdown) return String(total);
+  const head = fmtCount(item, total);
+  if (!item.options?.show_breakdown) return head;
   const { n, max } = breakdownOpts(item);
-  return `${total}${partsSep(item)}(${breakdown(snap.counters.agent_calls_by_type, n, max)})`;
+  return `${head}${partsSep(item)}(${breakdown(snap.counters.agent_calls_by_type, n, max)})`;
 };
 
 export const skillCallsRenderer = (snap: PulseSnapshot, item: Item): string => {
   const total = snap.counters.skill_calls_total;
   if (total === 0 && hideZero(item)) return "";
-  if (!item.options?.show_breakdown) return String(total);
+  const head = fmtCount(item, total);
+  if (!item.options?.show_breakdown) return head;
   const { n, max } = breakdownOpts(item);
-  return `${total}${partsSep(item)}(${breakdown(snap.counters.skill_calls_by_name, n, max)})`;
+  return `${head}${partsSep(item)}(${breakdown(snap.counters.skill_calls_by_name, n, max)})`;
 };
 
 export const toolCallRenderer = (snap: PulseSnapshot, item: Item): string => {
@@ -72,5 +83,5 @@ export const toolCallRenderer = (snap: PulseSnapshot, item: Item): string => {
   if (!name) return item.hide_when_empty ? "" : "?";
   const count = snap.counters.tool_calls_by_name[name] ?? 0;
   if (count === 0 && item.hide_when_empty) return "";
-  return String(count);
+  return fmtCount(item, count);
 };

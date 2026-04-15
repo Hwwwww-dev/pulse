@@ -31,6 +31,12 @@ export const BAR_STYLE_PRESETS = [
   "dot",
   "square",
   "ascii",
+  "braille",
+  "vertical",
+  "star",
+  "heart",
+  "flower",
+  "chevron",
 ] as const;
 
 export interface ExtraFlag {
@@ -393,7 +399,7 @@ export const ITEM_TYPE_DEFS: Record<ItemType, ItemTypeDef> = {
     ],
   },
   recent_agents: {
-    formats: [],
+    formats: DURATION_FORMATS,
     supportsVariant: false,
     extraFlags: [{ label: "show_completed", key: "agents_show_completed" }],
   },

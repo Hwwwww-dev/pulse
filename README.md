@@ -3,149 +3,168 @@
 # pulse
 
 [![npm version](https://img.shields.io/npm/v/@hwwwww/pulse?color=crimson&logo=npm)](https://www.npmjs.com/package/@hwwwww/pulse)
-[![npm downloads](https://img.shields.io/npm/dm/@hwwwww/pulse?color=blue&logo=npm)](https://www.npmjs.com/package/@hwwwww/pulse)
 [![license](https://img.shields.io/npm/l/@hwwwww/pulse?color=green)](./LICENSE)
 [![bun](https://img.shields.io/badge/bun-%E2%89%A51.3-black?logo=bun)](https://bun.sh)
-[![typescript](https://img.shields.io/badge/typescript-5.5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![stars](https://img.shields.io/github/stars/Hwwwww-dev/pulse?style=flat&logo=github)](https://github.com/Hwwwww-dev/pulse)
+[![npm downloads](https://img.shields.io/npm/dm/@hwwwww/pulse?color=blue&logo=npm)](https://www.npmjs.com/package/@hwwwww/pulse)
+[![bundle size](https://img.shields.io/bundlephobia/minzip/@hwwwww/pulse?color=orange)](https://bundlephobia.com/package/@hwwwww/pulse)
+[![types](https://img.shields.io/npm/types/@hwwwww/pulse?color=blueviolet)](https://www.npmjs.com/package/@hwwwww/pulse)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](https://github.com/Hwwwww-dev/pulse/pulls)
+[![issues](https://img.shields.io/github/issues/Hwwwww-dev/pulse?logo=github)](https://github.com/Hwwwww-dev/pulse/issues)
+[![last commit](https://img.shields.io/github/last-commit/Hwwwww-dev/pulse?logo=github)](https://github.com/Hwwwww-dev/pulse/commits)
+[![GitHub stars](https://img.shields.io/github/stars/Hwwwww-dev/pulse?style=social)](https://github.com/Hwwwww-dev/pulse/stargazers)
 
-> Lightweight, fully-customizable statusline for [Claude Code](https://claude.ai/code) — model, context, tokens, cost, git, rate limits.
+**A statusline for [Claude Code](https://claude.ai/code) that actually shows you what's going on.**
+Context pressure, token burn, cost, rate limits, git state — glanceable at all times.
 
 ![pulse screenshot](./assets/screenshot.png)
 
-## Features
+---
 
-- **Powerline ribbon** with arrow transitions and an 8-slot palette that auto-maps across themes — a config saved under `minimal` stays readable under `powerline` and vice versa.
-- **Dynamic bars & blink warnings** — `context_usage`, `*_limit` and `context_bar` tint their bar/value/label with a green→yellow→red ramp and pulse when a danger threshold is crossed.
-- **Incremental jsonl cursor** — session counters are accumulated via byte-offset replay, so each one-shot render stays fast even on long transcripts.
-- **Rich activity items** — `token_rate` (sliding window), `recent_tools` / `recent_agents` trail, `todos_progress` snapshot from `TodoWrite`, per-tool / per-agent / per-skill counters with breakdowns.
-- **Searchable TUI editor** with categorized type picker, 24-color palette, live preview, and in-place threshold/blink tuning.
-- **Portable cache** at `~/.pulse/.cache/` — external dashboards can read `general.json` / `sessions/*.json` without re-parsing jsonl.
+## ✨ Features
 
-## Install
+- **Interactive TUI editor** — live preview, color pickers, drag-reorder items across lines; no JSON editing required
+- **30+ item types** — model, cost, tokens in/out/cache, context usage, 5h & weekly limits with reset countdowns, recent tools/agents, todos progress, git branch, clock, custom shell commands, bars, spacers ([full list →](https://github.com/Hwwwww-dev/pulse))
+- **Dynamic color ramps** — bars shift green→yellow→red as danger thresholds are crossed; threshold is tunable per item
+- **14 bar styles** — thin, block, braille, and more; mix per item
+- **Multi-line layouts** — per-line background colors and rich glyph styling
+- **Per-sub-part style targeting** — color the label, bar, and value of one item independently
+- **Incremental JSONL cursor** — re-parses only new bytes each render; stays fast on long sessions
+
+---
+
+## 🔒 Offline
+
+> **Pulse runs fully offline.** No network calls, no telemetry, no API keys — it only reads the JSON payload Claude Code pipes on stdin and Claude Code's own session JSONL transcripts on your local disk.
+>
+> ⚠️ Because the **5-hour** and **weekly** rate-limit values come from that stdin payload, they refresh only when Claude Code pushes a new statusline tick — so they may lag slightly behind the live counters shown inside Claude Code itself.
+
+---
+
+## 🚀 Install
 
 ```bash
-npm i -g @hwwwww/pulse
+bunx @hwwwww/pulse@latest
 ```
 
-## Setup
+No global install needed — runs directly via `bunx`. For frequent use you can install globally: `bun add -g @hwwwww/pulse`.
 
-Add to `~/.claude/settings.json`:
+Runtime: requires **Bun ≥ 1.3** — the binary uses Bun's shebang.
 
-```json
-"statusLine": { "type": "command", "command": "bunx @hwwwww/pulse" }
-```
+---
 
-## Configure
+## ⚙️ Setup
 
-```bash
-bunx @hwwwww/pulse
-```
-
-Opens an interactive TUI editor with live preview. Config saved to `~/.pulse/config.json`.
-
-## Items
-
-<details>
-<summary>30+ built-in items (click to expand)</summary>
-
-| Category | Items |
-|----------|-------|
-| Session | `model` `session_name` `session_id` `version` `output_style` `vim_mode` `agent_name` `worktree` |
-| Context & Tokens | `context_usage` `context_bar` `tokens_input` `tokens_output` `tokens_cache_read` `tokens_cache_create` `tokens_summary` `token_rate` |
-| Cost & Duration | `cost` `duration` `api_duration` |
-| Rate Limits | `five_hour_limit` `seven_day_limit` `five_hour_bar` `seven_day_bar` `reset_in_5h` `reset_in_7d` |
-| Git | `git_branch` `lines_changed` |
-| Workspace | `cwd` `project_dir` |
-| Counters | `tool_calls` `tool_call` `agent_calls` `skill_calls` `recent_tools` `recent_agents` `todos_progress` |
-| Utilities | `clock` `text` `spacer` `custom_command` |
-
-</details>
-
-Every item supports `label` / `style` / `margin_*` / `trailing_separator` / `hide_when_empty` and type-specific `options`. Bars (`*_bar`) take `bar_width`, `bar_style`, `dynamic_color`. Paths (`cwd`, `project_dir`) take `path_mode: basename|tilde|short|full`. See the TUI editor for the full set.
-
-### Styling
-
-`style.color` is a single semantic field: on classic themes (`minimal` / `pastel`) it paints the text foreground; on `powerline` it becomes the slot background, and a paired foreground is resolved from the built-in palette map so configs stay readable across theme switches. Custom hex codes outside the palette pass through literally.
-
-## Example
+Add one entry to `~/.claude/settings.json`:
 
 ```json
 {
-  "schema_version": 1,
-  "theme": "minimal",
-  "default_separator": "  ",
+  "statusLine": {
+    "type": "command",
+    "command": "bunx @hwwwww/pulse@latest",
+    "padding": 0
+  }
+}
+```
+
+Restart Claude Code. The statusline appears immediately.
+
+---
+
+## 🎨 Customize
+
+Run `bunx @hwwwww/pulse@latest` with no arguments to open the TUI editor (or `pulse` if installed globally):
+
+```bash
+bunx @hwwwww/pulse@latest
+```
+
+Config file location: `~/.pulse/config.json`
+
+You can hand-edit it directly or use the in-app editor — both stay in sync. The TUI provides a live preview, color picker, threshold tuner, and item reordering across lines.
+
+Hand-edited example:
+
+```json
+{
   "lines": [{
     "items": [
-      { "id": "m", "type": "model", "style": { "color": "#957FB8", "bold": true } },
-      { "id": "c", "type": "context_usage", "label": "Ctx:", "options": { "dynamic_color": true, "show_bar": true } },
-      { "id": "g", "type": "git_branch", "style": { "color": "#98BB6C" } },
-      { "id": "$", "type": "cost", "label": "$", "options": { "format": "usd2" } }
+      { "id": "m", "type": "model",         "style": { "color": "#957FB8", "bold": true } },
+      { "id": "c", "type": "context_usage", "options": { "dynamic_color": true, "show_bar": true } },
+      { "id": "g", "type": "git_branch",    "style": { "color": "#98BB6C" } },
+      { "id": "$", "type": "cost",          "options": { "format": "usd2" } }
     ]
   }]
 }
 ```
 
-Themes: `minimal` · `pastel` · `powerline` (ribbon with arrow transitions, auto-mapped palette).
+---
 
-## TUI Editor Shortcuts
+## 📦 Item types
 
-| Scope | Keys | Action |
-|-------|------|--------|
-| Layout page | `↑↓` / `n` / `d` / `x` | select / new item / duplicate / delete |
-| Layout page | `q` / `r` / `s` | quit / reset / save |
-| Edit modal | `↑↓` | switch field |
-| Edit modal | `←→` / `Shift+←→` | change value / big step |
-| Edit modal | `Space` | toggle boolean · open type picker |
-| Edit modal | `Enter` / `Esc` | save / cancel |
-| Type picker | type to filter · `↑↓` navigate · `Enter` select · `Esc` cancel |
+40 built-in items, grouped by purpose. Add any of them via the in-app type picker.
 
-## Development
+| Category | Items |
+|---|---|
+| **Session** | `model` · `session_name` · `session_id` · `agent_name` · `output_style` · `vim_mode` · `version` · `clock` |
+| **Workspace** | `cwd` · `project_dir` · `worktree` · `git_branch` |
+| **Cost & Duration** | `cost` · `duration` · `api_duration` · `lines_changed` |
+| **Tokens** | `tokens_input` · `tokens_output` · `tokens_cache_read` · `tokens_cache_create` · `tokens_summary` · `token_rate` |
+| **Context** | `context_usage` · `context_bar` |
+| **Rate limits** | `five_hour_limit` · `seven_day_limit` · `five_hour_bar` · `seven_day_bar` · `reset_in_5h` · `reset_in_7d` |
+| **Counters** | `tool_calls` · `agent_calls` · `skill_calls` · `tool_call` |
+| **Activity** | `recent_agents` · `recent_tools` · `todos_progress` |
+| **Custom** | `custom_command` · `text` · `spacer` |
+
+Each item supports per-instance `style`, `label`, `format`, dynamic color thresholds, and width padding. The full schema lives in [`src/config/schema.ts`](./src/config/schema.ts).
+
+---
+
+## 🛠️ Development
+
+Want to hack on pulse or contribute a new item type? Clone and run locally:
 
 ```bash
-git clone https://github.com/Hwwwww-dev/pulse
+git clone https://github.com/Hwwwww-dev/pulse.git
 cd pulse
 bun install
-
-bun run typecheck   # tsc --noEmit
-bun test            # 180+ tests, render + UI + cli
-bun run dev         # launch TUI editor against a dummy stdin payload
-bun run build       # bundle dist/pulse.js (bin) + dist/index.js
+bun run dev          # run the editor against your real config
+bun test             # run the test suite
+bun run typecheck    # strict TypeScript check
+bun run build        # produce dist/pulse.js
 ```
 
-To iterate against a real Claude Code session, point `statusLine.command` in `~/.claude/settings.json` at your checkout:
+Project layout:
 
-```json
-"statusLine": { "type": "command", "command": "bun run --cwd /abs/path/to/pulse src/cli/bin.ts" }
-```
+- `src/cli/`      — CLI entry, render-mode pipeline
+- `src/render/`   — item renderers, format helpers, engine
+- `src/ui/`       — Ink-based TUI editor (pages, components, hooks)
+- `src/config/`   — schema, themes, palette, persistence
+- `test/`         — Bun test suite
 
-## Architecture
+PRs and issues are welcome — see the [issue tracker](https://github.com/Hwwwww-dev/pulse/issues).
 
-```
-stdin payload ─┐
-               ├─▶ SessionCounters (jsonl incremental cursor)
-jsonl transcript ─┘        │
-                           ▼
-                    PulseSnapshot  ──▶  renderSafe(config)  ──▶  ANSI string
-                           │
-                           └──▶ ~/.pulse/.cache/{general,index,sessions/*}.json
-```
+---
 
-Each Claude Code invocation is a one-shot process. The byte-offset cursor in `~/.pulse/.cache/sessions/<id>.json` keeps re-parse cost proportional to new jsonl lines only, so latency stays flat as sessions grow. External tools can consume the cache files directly — schema is published in `src/core/types.ts`.
+## ⭐ Star History
 
-## Environment
+[![Star History Chart](https://api.star-history.com/svg?repos=Hwwwww-dev/pulse&type=Date)](https://star-history.com/#Hwwwww-dev/pulse&Date)
 
-| Variable | Description |
-|----------|-------------|
-| `PULSE_HOME` | Override base dir (default `~`) |
-| `NO_COLOR` | Disable ANSI colors |
-| `COLORTERM=truecolor` | Enable 24-bit color |
+If pulse helps your daily flow, a ⭐ on GitHub means a lot — thanks!
 
-## Acknowledgements
+---
 
-- [claude-hud](https://github.com/jarrodwatts/claude-hud) — inspired item design (context, tools, agents, todos)
-- [ccstatusline](https://github.com/sirmalloc/ccstatusline) — inspired theming and rendering approach
+## 🙏 Acknowledgments
 
-## License
+Pulse was built standing on the shoulders of giants:
 
-MIT
+- [Claude Code](https://claude.ai/code) — the agentic coding tool this statusline was made for
+- [Bun](https://bun.sh) — the runtime, bundler, and test runner that keeps pulse fast
+- [Ink](https://github.com/vadimdemedes/ink) — React for interactive command-line apps, powering the TUI editor
+- [Zod](https://zod.dev) — runtime schema validation for the config file
+- Inspired by [ccstatusline](https://github.com/sirmalloc/ccstatusline) and [claude-hud](https://github.com/jarrodwatts/claude-hud) — thanks for paving the way
+
+Special thanks to everyone who has filed issues, suggested item types, or starred the repo. ⭐
+
+## 📜 License
+
+MIT © [hwwwww](https://github.com/Hwwwww-dev)

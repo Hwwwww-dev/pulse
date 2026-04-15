@@ -9,7 +9,13 @@ export type BarStyleName =
   | "double"
   | "dot"
   | "square"
-  | "ascii";
+  | "ascii"
+  | "braille"
+  | "vertical"
+  | "star"
+  | "heart"
+  | "flower"
+  | "chevron";
 
 export const BAR_STYLES: Record<BarStyleName, { filled: string; empty: string }> = {
   dingbat: { filled: "▰", empty: "▱" },
@@ -20,6 +26,12 @@ export const BAR_STYLES: Record<BarStyleName, { filled: string; empty: string }>
   dot: { filled: "●", empty: "○" },
   square: { filled: "■", empty: "□" },
   ascii: { filled: "#", empty: "-" },
+  braille: { filled: "⣿", empty: "⣀" },
+  vertical: { filled: "▮", empty: "▯" },
+  star: { filled: "★", empty: "☆" },
+  heart: { filled: "♥", empty: "♡" },
+  flower: { filled: "✿", empty: "❀" },
+  chevron: { filled: "❯", empty: "❭" },
 };
 
 export function drawBar(percent: number, item: Item): string {

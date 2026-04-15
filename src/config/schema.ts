@@ -120,6 +120,12 @@ export const ItemOptionsSchema = z
         "dot",
         "square",
         "ascii",
+        "braille",
+        "vertical",
+        "star",
+        "heart",
+        "flower",
+        "chevron",
       ])
       .optional(),
     bar_filled: z.string().optional(),
