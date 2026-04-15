@@ -341,3 +341,21 @@ test("thresholdColor ignores legacy bar_thresholds even with dynamic_color on", 
   // Picks from default ramp (40% band → pastel yellow), not user thresholds.
   expect(thresholdColor(50, item)).toBe("#FFE4A1");
 });
+
+test("thresholdColor honours custom color_ramp_stops (colors stay default)", () => {
+  // Shift breakpoints inward so 30% already lands in the danger band.
+  const item: Item = {
+    id: "t",
+    type: "context_bar",
+    options: {
+      dynamic_color: true,
+      color_ramp_stops: [0, 5, 10, 20, 30],
+    },
+  };
+  // Tier colors are unchanged (DEFAULT_DANGER_RAMP), only `at` values shift.
+  expect(thresholdColor(0, item)).toBe("#D8F0B1");   // pastel green
+  expect(thresholdColor(7, item)).toBe("#C3E88D");   // vibrant green (>=5)
+  expect(thresholdColor(15, item)).toBe("#FFE4A1");  // pastel yellow (>=10)
+  expect(thresholdColor(25, item)).toBe("#FFCB6B");  // vibrant yellow (>=20)
+  expect(thresholdColor(50, item)).toBe("#F07178");  // vibrant red (>=30)
+});

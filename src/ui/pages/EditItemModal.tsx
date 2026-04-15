@@ -132,15 +132,38 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
   const extraNums = allExtraNums.filter(
     (n) => !n.requiresFlag || Boolean(opts[n.requiresFlag]),
   );
+  // Sibling array-backed nums (e.g. color_ramp_stops[0..4]) collide on
+  // FieldKey `num:<key>`. Disambiguate via arrayIndex when present.
+  const numFieldKey = (
+    n: { key: string; arrayIndex?: number },
+  ): FieldKey =>
+    (n.arrayIndex === undefined
+      ? `num:${n.key}`
+      : `num:${n.key}#${n.arrayIndex}`) as FieldKey;
+  // Read the current scalar value of an ExtraNum, transparently unwrapping
+  // an array slot when arrayIndex is set.
+  const readNumValue = (
+    n: {
+      key: string;
+      defaultValue: number;
+      arrayIndex?: number;
+      arrayDefaults?: readonly number[];
+    },
+  ): number => {
+    const raw = (item.options as Record<string, unknown> | undefined)?.[n.key];
+    if (n.arrayIndex === undefined) {
+      return (raw as number | undefined) ?? n.defaultValue;
+    }
+    const arr = Array.isArray(raw) ? (raw as number[]) : undefined;
+    return arr?.[n.arrayIndex] ?? n.arrayDefaults?.[n.arrayIndex] ?? n.defaultValue;
+  };
   const flagFields: readonly FieldKey[] = extraFlags.map(
     (f) => `flag:${f.key}` as FieldKey,
   );
   const enumFields: readonly FieldKey[] = extraEnums.map(
     (e) => `enum:${e.key}` as FieldKey,
   );
-  const numFields: readonly FieldKey[] = extraNums.map(
-    (n) => `num:${n.key}` as FieldKey,
-  );
+  const numFields: readonly FieldKey[] = extraNums.map((n) => numFieldKey(n));
   const textFields: readonly FieldKey[] = extraTexts.map(
     (t) => `text:${t.key}` as FieldKey,
   );
@@ -305,19 +328,42 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
       activeField.startsWith("num:") &&
       (key.leftArrow || key.rightArrow)
     ) {
-      const numKey = activeField.slice(4);
-      const def2 = extraNums.find((n) => n.key === numKey);
+      // FieldKey is `num:<key>` for scalars and `num:<key>#<idx>` for
+      // array-backed sibling nums (e.g. color_ramp_stops[i]).
+      const rest = activeField.slice(4);
+      const hashAt = rest.indexOf("#");
+      const numKey = hashAt < 0 ? rest : rest.slice(0, hashAt);
+      const fieldArrayIdx = hashAt < 0 ? undefined : Number(rest.slice(hashAt + 1));
+      const def2 = extraNums.find(
+        (n) => n.key === numKey && n.arrayIndex === fieldArrayIdx,
+      );
       if (!def2) return;
-      const cur = ((item.options as Record<string, unknown> | undefined)?.[numKey] as number | undefined) ?? def2.defaultValue;
+      const cur = readNumValue(def2);
       const step = def2.step ?? 1;
       const bigStep = def2.bigStep ?? step * 10;
       const magnitude = key.shift ? bigStep : step;
       const delta = (key.rightArrow ? 1 : -1) * magnitude;
-      const next = Math.max(def2.min, Math.min(def2.max, cur + delta));
-      const nextOptions = {
-        ...(item.options ?? {}),
-        [numKey]: next,
-      } as Item["options"];
+      let next = Math.max(def2.min, Math.min(def2.max, cur + delta));
+      const optsRec = (item.options as Record<string, unknown> | undefined) ?? {};
+      let nextOptions: Item["options"];
+      if (def2.arrayIndex === undefined) {
+        nextOptions = { ...optsRec, [numKey]: next } as Item["options"];
+      } else {
+        // Materialise the full default array on first edit so the schema's
+        // length-5-ascending invariant always holds when persisted.
+        const existing = Array.isArray(optsRec[numKey])
+          ? (optsRec[numKey] as number[]).slice()
+          : (def2.arrayDefaults ?? []).slice();
+        if (def2.enforceAscending) {
+          const lo = def2.arrayIndex > 0 ? (existing[def2.arrayIndex - 1] ?? def2.min) : def2.min;
+          const hi = def2.arrayIndex < existing.length - 1
+            ? (existing[def2.arrayIndex + 1] ?? def2.max)
+            : def2.max;
+          next = Math.max(lo, Math.min(hi, next));
+        }
+        existing[def2.arrayIndex] = next;
+        nextOptions = { ...optsRec, [numKey]: existing } as Item["options"];
+      }
       onChange({ ...item, options: nextOptions });
       return;
     }
@@ -537,12 +583,13 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
       );
     }),
     ...extraNums.map((n) => {
-      const val = ((item.options as Record<string, unknown> | undefined)?.[n.key] as number | undefined) ?? n.defaultValue;
+      const val = readNumValue(n);
       const hint = n.min === 0 && val === 0 ? (n.zeroHint ?? " (all)") : "";
+      const fk = numFieldKey(n);
       return React.createElement(
         Text,
-        { key: `num:${n.key}` },
-        `${marker(`num:${n.key}` as FieldKey)} ${n.label}:${" ".repeat(Math.max(1, 14 - n.label.length - 1))}⟨ ${val} ⟩${hint}`,
+        { key: fk },
+        `${marker(fk)} ${n.label}:${" ".repeat(Math.max(1, 14 - n.label.length - 1))}⟨ ${val} ⟩${hint}`,
       );
     }),
     ...extraEnums.map((e) => {
