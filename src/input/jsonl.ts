@@ -48,6 +48,11 @@ function toNum(v: unknown): number {
   return typeof v === "number" && Number.isFinite(v) ? v : 0;
 }
 
+// SGR escape stripper — Claude Code wraps the chosen effort in `\x1b[1m…\x1b[22m`
+// for terminal bolding. Strip both the raw ESC byte and the JSON-escaped
+// `\u001b` text form (JSON.stringify escapes control chars) so the level
+// sits cleanly between plain words regardless of how the line reached us.
+const ANSI_SGR_REGEX = /(?:\x1b|\\u001b)\[[\d;]*m/gi;
 const THINKING_EFFORT_REGEX =
   /Set model to[\s\S]*? with (low|medium|high|xhigh|max) effort/i;
 
@@ -118,9 +123,9 @@ function consumeLine(counters: SessionCounters, line: string): void {
   };
 
   // Detect `/model` effort-change echoes emitted as local-command-stdout.
-  // Scan the raw line: the pattern is distinctive enough to avoid false positives,
-  // and this way we catch it regardless of whether content is a string or array.
-  const effortMatch = THINKING_EFFORT_REGEX.exec(line);
+  // Strip ANSI SGR wrappers first — Claude Code bolds the chosen level with
+  // `\x1b[1mxhigh\x1b[22m`, which would otherwise break the regex anchor.
+  const effortMatch = THINKING_EFFORT_REGEX.exec(line.replace(ANSI_SGR_REGEX, ""));
   if (effortMatch) {
     counters.thinking_effort = effortMatch[1]!.toLowerCase() as ThinkingEffortLevel;
   }
