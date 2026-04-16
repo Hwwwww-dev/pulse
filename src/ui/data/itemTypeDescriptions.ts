@@ -70,6 +70,13 @@ export const ITEM_TYPE_DESCRIPTIONS: Record<ItemType, ItemTypeDoc> = {
     summary: "Context window usage as a standalone bar.",
     details: ["Options: bar_style, bar_width, bar_show_value, dynamic_color."],
   },
+  exceeds_200k: {
+    summary: "Warning badge when context exceeds 200k tokens (1M-context sessions).",
+    details: [
+      "Renders the literal option (default \"⚠ 200k+\") when true; hidden otherwise.",
+      "Use with hide_when_empty and dynamic styling.",
+    ],
+  },
   tokens_input: {
     summary: "Total input tokens this session (non-cache).",
     details: ["format: tokens_compact (12.3k) | tokens_full (12345)."],
@@ -147,9 +154,20 @@ export const ITEM_TYPE_DESCRIPTIONS: Record<ItemType, ItemTypeDoc> = {
     summary: "Vim-mode indicator (NORMAL / INSERT / …).",
     details: ["Only renders when Claude Code reports vim mode."],
   },
+  thinking_effort: {
+    summary: "Thinking effort level (low / medium / high / xhigh / max).",
+    details: [
+      "Detected from /model command echoes in the transcript.",
+      "Empty until the user sets effort via /model in this session.",
+    ],
+  },
   worktree: {
     summary: "Git worktree name when you are inside a worktree.",
     details: ["Empty on the primary checkout — pair with hide_when_empty."],
+  },
+  worktree_branch: {
+    summary: "Git branch name inside a --worktree session.",
+    details: ["Empty when not in a worktree. Pair with worktree for (name → branch) display."],
   },
   version: {
     summary: "Claude Code CLI version string.",

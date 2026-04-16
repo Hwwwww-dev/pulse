@@ -1,6 +1,17 @@
-import type { PulseSnapshot } from "../../core/types.ts";
+import type { PulseSnapshot, ThinkingEffortLevel } from "../../core/types.ts";
 import type { Item } from "../../config/schema.ts";
 import { formatClock, type ClockFormat } from "../format.ts";
+import { wrapPartial } from "../ansi.ts";
+
+// Effort ladder: gray → yellow → orange → blue → red. Applied only when
+// `dynamic_color` is on. `max` additionally renders bold to stand out.
+const THINKING_EFFORT_COLORS: Record<ThinkingEffortLevel, string> = {
+  low: "#808080",
+  medium: "#FFCB6B",
+  high: "#FF9B3F",
+  xhigh: "#4A9EFF",
+  max: "#FF3B3B",
+};
 
 // Dead code removal: modelRenderer simplified (show_context_size ternary was always base)
 export const modelRenderer = (snap: PulseSnapshot, _item: Item): string => snap.claude.model.display_name;
@@ -29,6 +40,9 @@ export const agentNameRenderer = (snap: PulseSnapshot, _item: Item): string =>
 export const worktreeRenderer = (snap: PulseSnapshot, _item: Item): string =>
   snap.claude.worktree?.name ?? snap.claude.workspace.git_worktree ?? "";
 
+export const worktreeBranchRenderer = (snap: PulseSnapshot, _item: Item): string =>
+  snap.claude.worktree?.branch ?? "";
+
 export const textRenderer = (_snap: PulseSnapshot, item: Item): string =>
   item.options?.literal ?? "";
 
@@ -38,4 +52,14 @@ export const spacerRenderer = (_snap: PulseSnapshot, _item: Item): string => " "
 export const clockRenderer = (_snap: PulseSnapshot, item: Item): string => {
   const fmt = (item.options?.format ?? "clock_24") as ClockFormat;
   return formatClock(Date.now(), fmt);
+};
+
+export const thinkingEffortRenderer = (snap: PulseSnapshot, item: Item): string => {
+  const level = snap.counters.thinking_effort;
+  if (!level) return "";
+  if (!item.options?.dynamic_color) return level;
+  return wrapPartial(level, {
+    fg: THINKING_EFFORT_COLORS[level],
+    bold: level === "max",
+  });
 };

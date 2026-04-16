@@ -1,6 +1,6 @@
 {
   "name": "@hwwwww/pulse",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "Lightweight Claude Code statusline",
   "type": "module",
   "bin": {

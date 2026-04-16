@@ -16,11 +16,11 @@ export interface ItemTypeCategory {
 export const ITEM_TYPE_CATEGORIES: readonly ItemTypeCategory[] = [
   {
     name: "Identity",
-    types: ["model", "session_name", "session_id", "version", "output_style", "vim_mode"],
+    types: ["model", "session_name", "session_id", "version", "output_style", "vim_mode", "thinking_effort"],
   },
   {
     name: "Filesystem & Git",
-    types: ["cwd", "project_dir", "git_branch", "worktree"],
+    types: ["cwd", "project_dir", "git_branch", "worktree", "worktree_branch"],
   },
   {
     name: "Usage",
@@ -38,7 +38,7 @@ export const ITEM_TYPE_CATEGORIES: readonly ItemTypeCategory[] = [
   },
   {
     name: "Context",
-    types: ["context_usage", "context_bar"],
+    types: ["context_usage", "context_bar", "exceeds_200k"],
   },
   {
     name: "Rate Limits",

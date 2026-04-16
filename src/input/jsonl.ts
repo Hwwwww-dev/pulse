@@ -4,6 +4,7 @@ import type {
   RecentToolCall,
   SessionCounters,
   SessionUsageTotals,
+  ThinkingEffortLevel,
   TodoItem,
   UsageSample,
 } from "../core/types.ts";
@@ -47,6 +48,9 @@ function toNum(v: unknown): number {
   return typeof v === "number" && Number.isFinite(v) ? v : 0;
 }
 
+const THINKING_EFFORT_REGEX =
+  /Set model to[\s\S]*? with (low|medium|high|xhigh|max) effort/i;
+
 export interface JsonlParseResult {
   counters: SessionCounters;
   cursor: JsonlCursor;
@@ -74,6 +78,9 @@ export function cloneCounters(c: SessionCounters): SessionCounters {
       cache_creation_input_tokens: ut.cache_creation_input_tokens ?? 0,
     },
   };
+  if (c.thinking_effort !== undefined) {
+    result.thinking_effort = c.thinking_effort;
+  }
   // Clone HUD enrichment fields (shallow copy arrays)
   if (c.agent_entries !== undefined) {
     result.agent_entries = c.agent_entries.map((e) => ({ ...e }));
@@ -109,6 +116,14 @@ function consumeLine(counters: SessionCounters, line: string): void {
     timestamp?: string;
     message?: { content?: unknown; usage?: unknown };
   };
+
+  // Detect `/model` effort-change echoes emitted as local-command-stdout.
+  // Scan the raw line: the pattern is distinctive enough to avoid false positives,
+  // and this way we catch it regardless of whether content is a string or array.
+  const effortMatch = THINKING_EFFORT_REGEX.exec(line);
+  if (effortMatch) {
+    counters.thinking_effort = effortMatch[1]!.toLowerCase() as ThinkingEffortLevel;
+  }
 
   // Parse timestamp from entry (top-level field)
   const ts = parseTimestamp(r.timestamp) ?? Date.now();

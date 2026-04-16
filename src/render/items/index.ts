@@ -9,9 +9,11 @@ import {
   vimModeRenderer,
   agentNameRenderer,
   worktreeRenderer,
+  worktreeBranchRenderer,
   textRenderer,
   spacerRenderer,
   clockRenderer,
+  thinkingEffortRenderer,
 } from "./simple.ts";
 import { cwdRenderer, projectDirRenderer } from "./paths.ts";
 import {
@@ -38,6 +40,7 @@ import {
 import {
   contextUsageRenderer,
   contextBarRenderer,
+  exceeds200kRenderer,
   tokensInputRenderer,
   tokensOutputRenderer,
   tokensCacheReadRenderer,
@@ -107,6 +110,7 @@ export const RENDERERS: Record<ItemType, ItemRenderer> = {
   lines_changed: linesChangedRenderer,
   context_usage: contextUsageRenderer,
   context_bar: contextBarRenderer,
+  exceeds_200k: exceeds200kRenderer,
   tokens_input: tokensInputRenderer,
   tokens_output: tokensOutputRenderer,
   tokens_cache_read: tokensCacheReadRenderer,
@@ -125,7 +129,9 @@ export const RENDERERS: Record<ItemType, ItemRenderer> = {
   agent_name: agentNameRenderer,
   output_style: outputStyleRenderer,
   vim_mode: vimModeRenderer,
+  thinking_effort: thinkingEffortRenderer,
   worktree: worktreeRenderer,
+  worktree_branch: worktreeBranchRenderer,
   version: versionRenderer,
   clock: clockRenderer,
   text: textRenderer,

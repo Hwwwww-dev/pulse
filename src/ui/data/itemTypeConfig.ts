@@ -304,6 +304,11 @@ export const ITEM_TYPE_DEFS: Record<ItemType, ItemTypeDef> = {
     extraFlags: [...COLOR_TARGET_FLAGS, BLINK_FLAG, ...BLINK_TARGET_FLAGS],
     extraNums: [...COLOR_RAMP_STOP_NUMS, BLINK_AT_NUM],
   },
+  exceeds_200k: {
+    formats: [],
+    supportsVariant: false,
+    extraTexts: [{ label: "literal", key: "literal", placeholder: "⚠ 200k+" }],
+  },
 
   tokens_input: { formats: TOKENS_FORMATS, supportsVariant: true },
   tokens_output: { formats: TOKENS_FORMATS, supportsVariant: true },
@@ -399,7 +404,13 @@ export const ITEM_TYPE_DEFS: Record<ItemType, ItemTypeDef> = {
   agent_name: { formats: [], supportsVariant: false },
   output_style: { formats: [], supportsVariant: false },
   vim_mode: { formats: [], supportsVariant: false },
+  thinking_effort: {
+    formats: [],
+    supportsVariant: false,
+    supportsDynamicColor: true,
+  },
   worktree: { formats: [], supportsVariant: false },
+  worktree_branch: { formats: [], supportsVariant: false },
   version: { formats: [], supportsVariant: false },
   clock: { formats: CLOCK_FORMATS, supportsVariant: false },
   text: { formats: [], supportsVariant: false },
