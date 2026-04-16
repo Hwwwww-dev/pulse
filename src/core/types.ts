@@ -3,6 +3,8 @@
 // Single source of truth for input, render, and cache.
 // ============================================================
 
+export type ThinkingEffortLevel = "low" | "medium" | "high" | "xhigh" | "max";
+
 // -----------------------------------------------------------
 // 4.1 Claude Code stdin payload
 // -----------------------------------------------------------
@@ -203,6 +205,8 @@ export interface SessionCounters {
   todos?: TodoItem[];
   /** Per-message usage samples for rate calculation; GC'd to USAGE_SAMPLES_GC_MS window */
   usage_samples?: UsageSample[];
+  /** Latest thinking effort level parsed from `/model` echo lines in transcript. Undefined if never seen. */
+  thinking_effort?: ThinkingEffortLevel;
 }
 
 // -----------------------------------------------------------

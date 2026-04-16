@@ -154,12 +154,19 @@ function buildMockSnapshot(tick: number): PulseSnapshot {
           cache_read_input_tokens: 2000,
         },
       },
-      exceeds_200k_tokens: false,
+      exceeds_200k_tokens: ctxPct >= 85,
       rate_limits: {
         five_hour: { used_percentage: fiveHourPct, resets_at: Math.floor(BASE_NOW / 1000) + 3600 },
         seven_day: { used_percentage: sevenDayPct, resets_at: Math.floor(BASE_NOW / 1000) + 86400 },
       },
       agent: { name: "reviewer" },
+      worktree: {
+        name: "feat-preview",
+        path: "/home/me/projects/pulse-worktrees/feat-preview",
+        branch: "feat/live-preview",
+        original_cwd: "/home/me/projects/pulse",
+        original_branch: "main",
+      },
     },
     counters: {
       tool_calls_total: toolsTotal,
@@ -190,6 +197,9 @@ function buildMockSnapshot(tick: number): PulseSnapshot {
       agent_entries,
       recent_tools,
       todos,
+      thinking_effort: (["low", "medium", "high", "xhigh", "max"] as const)[
+        Math.floor(tick / 6) % 5
+      ]!,
       usage_samples: [
         { ts: now - 45_000, in_delta: inWiggle, out_delta: outWiggle },
         { ts: now - 25_000, in_delta: 1_800, out_delta: 950 },

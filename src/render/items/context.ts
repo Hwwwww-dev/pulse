@@ -51,6 +51,11 @@ export const contextBarRenderer = (snap: PulseSnapshot, item: Item): string => {
   return wrapPartial(drawBar(resolvePct(used, item), item), barStyle);
 };
 
+export const exceeds200kRenderer = (snap: PulseSnapshot, item: Item): string => {
+  if (!snap.claude.exceeds_200k_tokens) return "";
+  return item.options?.literal ?? "⚠ 200k+";
+};
+
 // Resolve the effective session total for each token dimension as
 // max(stdin.context_window.*, counters.usage_totals.*).
 // Rationale: after Claude Code --resume, stdin may report only the latest
