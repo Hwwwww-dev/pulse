@@ -55,8 +55,10 @@ export const clockRenderer = (_snap: PulseSnapshot, item: Item): string => {
 };
 
 export const thinkingEffortRenderer = (snap: PulseSnapshot, item: Item): string => {
-  const level = snap.counters.thinking_effort;
-  if (!level) return "";
+  // Fall back to `xhigh` — Claude Code's official default — when we've
+  // never seen a `/model` echo in the transcript. Matches the user's
+  // actual effort setting in the common case where they never ran /model.
+  const level: ThinkingEffortLevel = snap.counters.thinking_effort ?? "xhigh";
   if (!item.options?.dynamic_color) return level;
   return wrapPartial(level, {
     fg: THINKING_EFFORT_COLORS[level],

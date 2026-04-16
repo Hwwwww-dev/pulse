@@ -158,7 +158,8 @@ export const ITEM_TYPE_DESCRIPTIONS: Record<ItemType, ItemTypeDoc> = {
     summary: "Thinking effort level (low / medium / high / xhigh / max).",
     details: [
       "Detected from /model command echoes in the transcript.",
-      "Empty until the user sets effort via /model in this session.",
+      "Falls back to xhigh (Claude Code's default) when never set explicitly.",
+      "dynamic_color: gray → yellow → orange → blue → red; max is bold.",
     ],
   },
   worktree: {
