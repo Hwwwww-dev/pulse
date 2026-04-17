@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Box, Text, useInput } from "ink";
 import type { Item, ItemType } from "../../config/schema.ts";
 import { ItemTypeSchema } from "../../config/schema.ts";
@@ -8,6 +8,8 @@ import { ITEM_TYPE_DESCRIPTIONS } from "../data/itemTypeDescriptions.ts";
 import { TOOL_CATALOG } from "../data/toolCatalog.ts";
 import { defForType, BAR_STYLE_PRESETS } from "../data/itemTypeConfig.ts";
 import { TypePickerModal } from "./TypePickerModal.tsx";
+import { IconPickerModal } from "./IconPickerModal.tsx";
+import { graphemes } from "../../lib/graphemes.ts";
 
 export interface EditItemModalProps {
   item: Item;
@@ -23,6 +25,7 @@ export interface EditItemModalProps {
 type FieldKey =
   | "type"
   | "name"
+  | "icon"
   | "label"
   | "show_label"
   | "trailing_separator"
@@ -92,13 +95,20 @@ function setTextField(item: Item, field: "label" | "trailing_separator", value: 
   return { ...item, trailing_separator: value };
 }
 
-function formatTextField(value: string, active: boolean): string {
+function formatTextField(value: string, active: boolean, cursorPos?: number): string {
   if (!active) return JSON.stringify(value);
   // Inverse-video space acts as a block cursor so the user can see which
-  // field is currently accepting keystrokes. Placed before the closing
-  // quote to mimic an input-line caret.
+  // field is currently accepting keystrokes.
   const CURSOR = "\x1b[7m \x1b[27m";
-  return `"${value}${CURSOR}"`;
+  if (cursorPos === undefined) {
+    // Append-only fields: cursor always at end
+    return `"${value}${CURSOR}"`;
+  }
+  // Label with cursor at grapheme position
+  const g = graphemes(value);
+  const before = g.slice(0, cursorPos).join("");
+  const after = g.slice(cursorPos).join("");
+  return `"${before}${CURSOR}${after}"`;
 }
 
 function initialFocusFieldIndex(fields: readonly FieldKey[]): number {
@@ -175,6 +185,7 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
   const FIELDS: readonly FieldKey[] = [
     "type",
     ...(needsNameField ? (["name"] as const) : []),
+    "icon",
     "label",
     "show_label",
     "trailing_separator",
@@ -197,36 +208,92 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
   // When the type picker overlay is open, the parent input handler must stay
   // inert so keys (search text, ↑↓, Enter) only reach the picker.
   const [typePickerOpen, setTypePickerOpen] = useState<boolean>(false);
+  const [iconPickerOpen, setIconPickerOpen] = useState<boolean>(false);
+  // Snapshot of item.icon at the moment the picker opens. Preview mutations
+  // during picking rewrite item.icon live; if the user Escs we restore this.
+  const iconBeforePickRef = useRef<string | undefined>(undefined);
+  // Label cursor: grapheme index, 0..g.length
+  const [labelCursor, setLabelCursor] = useState<number>(0);
+  // When focus transitions INTO label, reset cursor to end
+  useEffect(() => {
+    if (activeField === "label") {
+      setLabelCursor(graphemes(item.label ?? "").length);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeField]);
 
   useInput((input, key) => {
     if (typePickerOpen) return;
+    if (iconPickerOpen) return;
     if (key.escape) { onCancel(); return; }
     // On the type field, Enter opens the picker instead of saving — users
     // need a way to launch the overlay without a binding collision.
     if (key.return) {
       if (activeField === "type") { setTypePickerOpen(true); return; }
+      if (activeField === "icon") {
+        iconBeforePickRef.current = item.icon;
+        setIconPickerOpen(true);
+        return;
+      }
       onClose();
       return;
     }
     if (key.upArrow) { setFocus((f) => (f - 1 + FIELDS.length) % FIELDS.length); return; }
     if (key.downArrow) { setFocus((f) => (f + 1) % FIELDS.length); return; }
 
-    if (activeField === "label" || activeField === "trailing_separator") {
-      const current = textFieldValue(item, activeField);
+    if (activeField === "icon") {
+      if (input === " ") {
+        iconBeforePickRef.current = item.icon;
+        setIconPickerOpen(true);
+        return;
+      }
+      if (key.backspace || key.delete) { onChange({ ...item, icon: undefined }); return; }
+      return; // swallow other keys
+    }
+
+    if (activeField === "label") {
+      const labelVal = item.label ?? "";
+      const g = graphemes(labelVal);
+      const pos = labelCursor;
+      if (key.leftArrow) { setLabelCursor(Math.max(0, pos - 1)); return; }
+      if (key.rightArrow) { setLabelCursor(Math.min(g.length, pos + 1)); return; }
       if (key.backspace || key.delete) {
-        if (activeField === "trailing_separator" && item.trailing_separator === undefined) {
-          onChange(setTextField(item, activeField, ""));
-          return;
+        if (key.backspace && pos > 0) {
+          const next = [...g.slice(0, pos - 1), ...g.slice(pos)].join("");
+          onChange(setTextField(item, "label", next));
+          setLabelCursor(pos - 1);
+        } else if (key.delete && pos < g.length) {
+          const next = [...g.slice(0, pos), ...g.slice(pos + 1)].join("");
+          onChange(setTextField(item, "label", next));
         }
-        onChange(setTextField(item, activeField, current.slice(0, -1)));
         return;
       }
       if (!key.ctrl && !key.meta && input.length > 0) {
-        if (activeField === "trailing_separator" && item.trailing_separator === undefined) {
-          onChange(setTextField(item, activeField, input));
+        const inserted = graphemes(input);
+        const next = [...g.slice(0, pos), ...inserted, ...g.slice(pos)].join("");
+        onChange(setTextField(item, "label", next));
+        setLabelCursor(pos + inserted.length);
+        return;
+      }
+      return;
+    }
+
+    if (activeField === "trailing_separator") {
+      const current = textFieldValue(item, "trailing_separator");
+      if (key.backspace || key.delete) {
+        if (item.trailing_separator === undefined) {
+          onChange(setTextField(item, "trailing_separator", ""));
           return;
         }
-        onChange(setTextField(item, activeField, current + input));
+        onChange(setTextField(item, "trailing_separator", current.slice(0, -1)));
+        return;
+      }
+      if (!key.ctrl && !key.meta && input.length > 0) {
+        if (item.trailing_separator === undefined) {
+          onChange(setTextField(item, "trailing_separator", input));
+          return;
+        }
+        onChange(setTextField(item, "trailing_separator", current + input));
         return;
       }
     }
@@ -524,8 +591,13 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
   children.push(
     React.createElement(
       Text,
+      { key: "icon" },
+      `${marker("icon")} icon:         ${item.icon !== undefined ? item.icon : "(none)"}${activeField === "icon" ? "\x1b[7m \x1b[27m   [Enter/Space] pick · Backspace clear" : ""}`,
+    ),
+    React.createElement(
+      Text,
       { key: "label" },
-      `${marker("label")} label:        ${formatTextField(labelValue, activeField === "label")}`,
+      `${marker("label")} label:        ${formatTextField(labelValue, activeField === "label", activeField === "label" ? labelCursor : undefined)}`,
     ),
     React.createElement(
       Text,
@@ -645,6 +717,26 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
         setTypePickerOpen(false);
       },
       onCancel: () => setTypePickerOpen(false),
+    });
+  }
+
+  if (iconPickerOpen) {
+    return React.createElement(IconPickerModal, {
+      current: item.icon,
+      onPreview: (glyph) => {
+        // Live-write the highlighted glyph so LivePreview updates as the
+        // cursor moves. Final commit (Enter) keeps whatever's there; cancel
+        // (Esc) restores iconBeforePickRef.
+        onChange({ ...item, icon: glyph });
+      },
+      onSelect: (glyph) => {
+        onChange({ ...item, icon: glyph });
+        setIconPickerOpen(false);
+      },
+      onCancel: () => {
+        onChange({ ...item, icon: iconBeforePickRef.current });
+        setIconPickerOpen(false);
+      },
     });
   }
 

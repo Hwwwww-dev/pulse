@@ -297,6 +297,7 @@ export const ItemSchema = z
   .object({
     id: z.string(),
     type: ItemTypeSchema,
+    icon: z.string().optional(),
     label: z.string().optional(),
     label_separator: z.string().optional(),
     style: TextStyleSchema.optional(),

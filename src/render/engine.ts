@@ -98,8 +98,10 @@ function renderItem(snap: PulseSnapshot, item: Item, theme: Theme | undefined): 
     const valueStyle = mergeStyle(themeStyle, itemStyle);
 
     // P0-2: Engine owns label assembly
+    // Icon sits flush against label; if no label, icon takes its place.
+    const effectiveLabel = (item.icon ?? "") + (item.label ?? "");
     let styled: string;
-    if (item.show_label === false || !item.label) {
+    if (item.show_label === false || effectiveLabel === "") {
       styled = applyStyle(value, valueStyle);
     } else {
       // Label effective style: explicit label_style wins; otherwise inherit
@@ -109,7 +111,7 @@ function renderItem(snap: PulseSnapshot, item: Item, theme: Theme | undefined): 
         ? mergeStyle(themeStyle, labelStyle)
         : valueStyle;
       const effectiveLabelStyle = mergeStyle(baseLabelStyle, undefined, labelOverride);
-      const labelText = item.label + (item.label_separator ?? " ");
+      const labelText = effectiveLabel + (item.label_separator ?? " ");
       styled = applyStyle(labelText, effectiveLabelStyle) + applyStyle(value, valueStyle);
     }
 
