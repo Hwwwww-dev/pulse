@@ -6,7 +6,6 @@
 [![license](https://img.shields.io/npm/l/@hwwwww/pulse?color=green)](./LICENSE)
 [![bun](https://img.shields.io/badge/bun-%E2%89%A51.3-black?logo=bun)](https://bun.sh)
 [![npm downloads](https://img.shields.io/npm/dm/@hwwwww/pulse?color=blue&logo=npm)](https://www.npmjs.com/package/@hwwwww/pulse)
-[![bundle size](https://img.shields.io/bundlephobia/minzip/@hwwwww/pulse?color=orange)](https://bundlephobia.com/package/@hwwwww/pulse)
 [![types](https://img.shields.io/npm/types/@hwwwww/pulse?color=blueviolet)](https://www.npmjs.com/package/@hwwwww/pulse)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](https://github.com/Hwwwww-dev/pulse/pulls)
 [![issues](https://img.shields.io/github/issues/Hwwwww-dev/pulse?logo=github)](https://github.com/Hwwwww-dev/pulse/issues)
@@ -23,7 +22,7 @@ Context pressure, token burn, cost, rate limits, git state — glanceable at all
 ## ✨ Features
 
 - **Interactive TUI editor** — live preview, color pickers, drag-reorder items across lines; no JSON editing required
-- **30+ item types** — model, cost, tokens in/out/cache, context usage, 5h & weekly limits with reset countdowns, recent tools/agents, todos progress, git branch, clock, custom shell commands, bars, spacers ([full list →](https://github.com/Hwwwww-dev/pulse))
+- **30+ item types** — model, cost, tokens in/out/cache, context usage, 5h & weekly limits with reset countdowns, recent tools/agents, todos progress, git branch, clock, custom shell commands
 - **Dynamic color ramps** — bars shift green→yellow→red as danger thresholds are crossed; threshold is tunable per item
 - **14 bar styles** — thin, block, braille, and more; mix per item
 - **Multi-line layouts** — per-line background colors and rich glyph styling

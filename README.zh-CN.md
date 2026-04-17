@@ -6,7 +6,6 @@
 [![license](https://img.shields.io/npm/l/@hwwwww/pulse?color=green)](./LICENSE)
 [![bun](https://img.shields.io/badge/bun-%E2%89%A51.3-black?logo=bun)](https://bun.sh)
 [![npm downloads](https://img.shields.io/npm/dm/@hwwwww/pulse?color=blue&logo=npm)](https://www.npmjs.com/package/@hwwwww/pulse)
-[![bundle size](https://img.shields.io/bundlephobia/minzip/@hwwwww/pulse?color=orange)](https://bundlephobia.com/package/@hwwwww/pulse)
 [![types](https://img.shields.io/npm/types/@hwwwww/pulse?color=blueviolet)](https://www.npmjs.com/package/@hwwwww/pulse)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](https://github.com/Hwwwww-dev/pulse/pulls)
 [![issues](https://img.shields.io/github/issues/Hwwwww-dev/pulse?logo=github)](https://github.com/Hwwwww-dev/pulse/issues)
@@ -23,7 +22,7 @@
 ## ✨ 功能
 
 - **交互式 TUI 编辑器** — 实时预览、颜色选择器、跨行拖拽排序，无需手写 JSON
-- **30+ 条目类型** — 模型、费用、输入/输出/缓存 Token、上下文用量、5小时与每周限额及重置倒计时、最近工具/Agent、Todo 进度、Git 分支、时钟、自定义 Shell 命令、进度条、空白分隔符（[完整列表 →](https://github.com/Hwwwww-dev/pulse)）
+- **30+ 条目类型** — 模型、费用、输入/输出/缓存 Token、上下文用量、5小时与每周限额及重置倒计时、最近工具/Agent、Todo 进度、Git 分支、时钟、自定义 Shell 命令
 - **动态颜色渐变** — 进度条按阈值从绿→黄→红渐变；阈值每条目可独立配置
 - **14 种进度条样式** — 细线、方块、盲文点阵等，每个条目单独设置
 - **多行布局** — 每行独立背景色，支持丰富字形样式
