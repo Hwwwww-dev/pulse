@@ -21,6 +21,21 @@ async function atomicWriteJson(filePath: string, data: unknown): Promise<void> {
   await rename(tmp, filePath);
 }
 
+/**
+ * Race-safe write: re-reads disk right before writing and skips if the
+ * on-disk `updated_at` is newer than ours. Protects against concurrent
+ * writers (multiple pulse instances) clobbering each other's data.
+ * Still has a small TOCTOU window but pulse self-heals on next render.
+ */
+async function writeLatestJson<T extends { updated_at: number }>(
+  filePath: string,
+  data: T,
+): Promise<void> {
+  const existing = await readJson<T>(filePath);
+  if (existing && existing.updated_at > data.updated_at) return;
+  await atomicWriteJson(filePath, data);
+}
+
 async function readJson<T>(filePath: string): Promise<T | undefined> {
   const f = Bun.file(filePath);
   if (!(await f.exists())) return undefined;
@@ -112,13 +127,28 @@ export async function writeCache(
     total_cost_usd: snapshot.claude.cost.total_cost_usd,
   });
   filtered.sort((a, b) => b.last_updated_at - a.last_updated_at);
+  // Race-safe merge: re-read disk right before writing and merge by session_id,
+  // preferring the entry with the newer last_updated_at. Protects against
+  // concurrent writers (multiple pulse instances) dropping each other's sessions.
+  const diskIndex = (await readIndex()) ?? { schema_version: 1, sessions: [] };
+  const mergedMap = new Map<string, (typeof filtered)[number]>();
+  for (const s of diskIndex.sessions) mergedMap.set(s.session_id, s);
+  for (const s of filtered) {
+    const prev = mergedMap.get(s.session_id);
+    if (!prev || s.last_updated_at >= prev.last_updated_at) {
+      mergedMap.set(s.session_id, s);
+    }
+  }
+  const merged = Array.from(mergedMap.values()).sort(
+    (a, b) => b.last_updated_at - a.last_updated_at,
+  );
   await atomicWriteJson(paths.indexFile(), {
     schema_version: 2,
-    sessions: filtered,
+    sessions: merged,
   } satisfies CacheIndexFile);
 
   const startOfDay = todayStart(now);
-  const todaySessions = filtered.filter((s) => s.last_updated_at >= startOfDay);
+  const todaySessions = merged.filter((s) => s.last_updated_at >= startOfDay);
   const todayTotalCost = todaySessions.reduce((a, s) => a + s.total_cost_usd, 0);
   const todayToolCalls = snapshot.counters.tool_calls_total;
   const general: GeneralCacheFile = {
@@ -138,5 +168,5 @@ export async function writeCache(
       total_tool_calls: todayToolCalls,
     },
   };
-  await atomicWriteJson(paths.generalCacheFile(), general);
+  await writeLatestJson(paths.generalCacheFile(), general);
 }

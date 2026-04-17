@@ -3,7 +3,7 @@ import type { Item } from "../../config/schema.ts";
 
 export const gitBranchRenderer = (snap: PulseSnapshot, item: Item): string => {
   const git = snap.git;
-  if (!git || !git.branch) return item.hide_when_empty ? "" : "—";
+  if (!git || !git.branch) return item.hide_when_empty ? "" : "-";
   const dirty = git.is_dirty ? item.options?.git_dirty_marker ?? "*" : "";
   let tail = "";
   if (item.options?.git_show_ahead_behind !== false) {

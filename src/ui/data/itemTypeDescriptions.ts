@@ -157,9 +157,15 @@ export const ITEM_TYPE_DESCRIPTIONS: Record<ItemType, ItemTypeDoc> = {
   thinking_effort: {
     summary: "Thinking effort level (low / medium / high / xhigh / max).",
     details: [
-      "Detected from /model command echoes in the transcript.",
-      "Falls back to xhigh (Claude Code's default) when never set explicitly.",
+      "Priority: ~/.claude/settings.json → /model & /effort JSONL echoes → '-'.",
       "dynamic_color: gray → yellow → orange → blue → red; max is bold.",
+    ],
+  },
+  sandbox_enabled: {
+    summary: "Shows Claude Code's sandbox mode state (reads ~/.claude/settings.json).",
+    details: [
+      "Formats: sandbox_on_off → on/off (default), sandbox_bool → true/false, sandbox_icon → 🔒/🔓.",
+      "Displays `-` when sandbox field is absent from settings.json.",
     ],
   },
   worktree: {

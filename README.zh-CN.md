@@ -34,7 +34,11 @@
 
 ## 🔒 离线运行
 
-> **Pulse 完全离线运行。** 不发起任何网络请求，无遥测，无需 API Key —— 仅读取 Claude Code 通过 stdin 传入的 JSON payload，以及本机磁盘上 Claude Code 自身的 JSONL 会话记录。
+> **Pulse 完全离线、100% 本地运行。** 不发起任何网络请求，无遥测，无需 API Key —— 仅读取：
+>
+> - Claude Code 通过 stdin 传入的 JSON payload，
+> - 本机磁盘上 Claude Code 自身的 JSONL 会话记录，
+> - Claude Code 的用户配置 `~/.claude/settings.json`（用于读取 thinking effort、output style、sandbox 模式等环境状态）。
 >
 > ⚠️ **5 小时** 与 **每周** 速率限制数据来源于 stdin payload，仅在 Claude Code 推送新的状态栏 tick 时刷新，可能比 Claude Code 内部实时计数略有延迟。
 

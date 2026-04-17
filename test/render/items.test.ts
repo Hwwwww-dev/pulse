@@ -20,6 +20,15 @@ test("model renders display_name", () => {
   expect(renderRaw("model")).toBe("Opus");
 });
 
+test("model strips ' context' inside parens", () => {
+  const custom = {
+    ...snap,
+    claude: { ...snap.claude, model: { id: "x", display_name: "Opus 4.7 (1M context) (default)" } },
+  };
+  const out = stripAnsi(RENDERERS.model(custom, { id: "t", type: "model" }));
+  expect(out).toBe("Opus 4.7 (1M) (default)");
+});
+
 test("session_name falls back to short id", () => {
   const claudeNoName = { ...snap.claude };
   delete (claudeNoName as { session_name?: string }).session_name;
@@ -47,16 +56,20 @@ test("cwd basename", () => {
 });
 
 test("cwd tilde", () => {
+  const orig = Bun.env.PULSE_HOME;
   (Bun.env as Record<string, string>).PULSE_HOME = "/home/me";
   const out = renderRaw("cwd", { options: { path_mode: "tilde" } });
-  delete (Bun.env as Record<string, string | undefined>).PULSE_HOME;
+  if (orig !== undefined) (Bun.env as Record<string, string>).PULSE_HOME = orig;
+  else delete (Bun.env as Record<string, string | undefined>).PULSE_HOME;
   expect(out).toBe("~/projects/pulse");
 });
 
 test("cwd short", () => {
+  const orig = Bun.env.PULSE_HOME;
   (Bun.env as Record<string, string>).PULSE_HOME = "/home/me";
   const out = renderRaw("cwd", { options: { path_mode: "short" } });
-  delete (Bun.env as Record<string, string | undefined>).PULSE_HOME;
+  if (orig !== undefined) (Bun.env as Record<string, string>).PULSE_HOME = orig;
+  else delete (Bun.env as Record<string, string | undefined>).PULSE_HOME;
   expect(out).toBe("~/p/pulse");
 });
 
@@ -207,6 +220,15 @@ test("git_branch shows dirty marker", () => {
   expect(out).toBe("main*/+1");
 });
 
+test("git_branch falls back to '-' when git info missing", () => {
+  const noGit = { ...snap };
+  delete (noGit as { git?: unknown }).git;
+  const out = stripAnsi(
+    RENDERERS.git_branch(noGit as typeof snap, { id: "t", type: "git_branch" }),
+  );
+  expect(out).toBe("-");
+});
+
 test("show_label: false hides label", () => {
   const out = stripAnsi(
     RENDERERS.cost(snap, { id: "t", type: "cost", label: "💰", show_label: false, options: { format: "usd4" } }),
@@ -306,6 +328,123 @@ test("tool_call with hide_when_empty and zero count returns empty", () => {
     options: { tool_name: "NonExistent" },
   });
   expect(out).toBe("");
+});
+
+test("thinking_effort returns '-' when no settings and no counter", () => {
+  const bare = { ...snap };
+  delete (bare as { claude_settings?: unknown }).claude_settings;
+  const countersCopy = { ...bare.counters };
+  delete (countersCopy as { thinking_effort?: unknown }).thinking_effort;
+  const snapNone = { ...bare, counters: countersCopy } as typeof snap;
+  const out = stripAnsi(
+    RENDERERS.thinking_effort(snapNone, { id: "t", type: "thinking_effort" }),
+  );
+  expect(out).toBe("-");
+});
+
+test("thinking_effort: settings.effortLevel wins over counters.thinking_effort", () => {
+  const both = {
+    ...snap,
+    claude_settings: { effortLevel: "high" as const },
+    counters: { ...snap.counters, thinking_effort: "low" as const },
+  };
+  const out = stripAnsi(
+    RENDERERS.thinking_effort(both, { id: "t", type: "thinking_effort" }),
+  );
+  expect(out).toBe("high");
+});
+
+test("thinking_effort falls back to JSONL counter when settings missing", () => {
+  const bare = { ...snap };
+  delete (bare as { claude_settings?: unknown }).claude_settings;
+  const withCounter = {
+    ...bare,
+    counters: { ...bare.counters, thinking_effort: "medium" as const },
+  } as typeof snap;
+  const out = stripAnsi(
+    RENDERERS.thinking_effort(withCounter, { id: "t", type: "thinking_effort" }),
+  );
+  expect(out).toBe("medium");
+});
+
+test("output_style: stdin value wins", () => {
+  const withStdin = {
+    ...snap,
+    claude: { ...snap.claude, output_style: { name: "explanatory" } },
+    claude_settings: { outputStyle: "rem-engineer" },
+  };
+  const out = stripAnsi(
+    RENDERERS.output_style(withStdin, { id: "t", type: "output_style" }),
+  );
+  expect(out).toBe("explanatory");
+});
+
+test("output_style: falls back to claude_settings.outputStyle when stdin absent", () => {
+  const noStdin = { ...snap, claude: { ...snap.claude } };
+  delete (noStdin.claude as { output_style?: unknown }).output_style;
+  const withSettings = {
+    ...noStdin,
+    claude_settings: { outputStyle: "rem-engineer" },
+  };
+  const out = stripAnsi(
+    RENDERERS.output_style(withSettings, { id: "t", type: "output_style" }),
+  );
+  expect(out).toBe("rem-engineer");
+});
+
+test("output_style: returns '-' when both absent", () => {
+  const noStdin = { ...snap, claude: { ...snap.claude } };
+  delete (noStdin.claude as { output_style?: unknown }).output_style;
+  const cleaned = { ...noStdin };
+  delete (cleaned as { claude_settings?: unknown }).claude_settings;
+  const out = stripAnsi(
+    RENDERERS.output_style(cleaned as typeof snap, { id: "t", type: "output_style" }),
+  );
+  expect(out).toBe("-");
+});
+
+test("sandbox_enabled: returns '-' when settings absent", () => {
+  const bare = { ...snap };
+  delete (bare as { claude_settings?: unknown }).claude_settings;
+  const out = stripAnsi(
+    RENDERERS.sandbox_enabled(bare as typeof snap, { id: "t", type: "sandbox_enabled" }),
+  );
+  expect(out).toBe("-");
+});
+
+test("sandbox_enabled: default format 'on'/'off'", () => {
+  const on = { ...snap, claude_settings: { sandboxEnabled: true } };
+  const off = { ...snap, claude_settings: { sandboxEnabled: false } };
+  expect(
+    stripAnsi(RENDERERS.sandbox_enabled(on, { id: "t", type: "sandbox_enabled" })),
+  ).toBe("on");
+  expect(
+    stripAnsi(RENDERERS.sandbox_enabled(off, { id: "t", type: "sandbox_enabled" })),
+  ).toBe("off");
+});
+
+test("sandbox_enabled: sandbox_bool format", () => {
+  const on = { ...snap, claude_settings: { sandboxEnabled: true } };
+  const out = stripAnsi(
+    RENDERERS.sandbox_enabled(on, {
+      id: "t",
+      type: "sandbox_enabled",
+      options: { format: "sandbox_bool" },
+    }),
+  );
+  expect(out).toBe("true");
+});
+
+test("sandbox_enabled: sandbox_icon format", () => {
+  const off = { ...snap, claude_settings: { sandboxEnabled: false } };
+  const out = stripAnsi(
+    RENDERERS.sandbox_enabled(off, {
+      id: "t",
+      type: "sandbox_enabled",
+      options: { format: "sandbox_icon" },
+    }),
+  );
+  expect(out).toBe("🔓");
 });
 
 test("thresholdColor returns undefined when dynamic_color is off", () => {

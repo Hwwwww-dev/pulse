@@ -14,7 +14,8 @@ const THINKING_EFFORT_COLORS: Record<ThinkingEffortLevel, string> = {
 };
 
 // Dead code removal: modelRenderer simplified (show_context_size ternary was always base)
-export const modelRenderer = (snap: PulseSnapshot, _item: Item): string => snap.claude.model.display_name;
+export const modelRenderer = (snap: PulseSnapshot, _item: Item): string =>
+  snap.claude.model.display_name.replace(/ context(?=\))/g, "");
 
 export const sessionNameRenderer = (snap: PulseSnapshot, _item: Item): string =>
   snap.claude.session_name ?? snap.claude.session_id.slice(0, 6);
@@ -29,7 +30,7 @@ export const sessionIdRenderer = (snap: PulseSnapshot, item: Item): string => {
 export const versionRenderer = (snap: PulseSnapshot, _item: Item): string => snap.claude.version;
 
 export const outputStyleRenderer = (snap: PulseSnapshot, _item: Item): string =>
-  snap.claude.output_style?.name ?? "";
+  snap.claude.output_style?.name ?? snap.claude_settings?.outputStyle ?? "-";
 
 export const vimModeRenderer = (snap: PulseSnapshot, _item: Item): string =>
   snap.claude.vim?.mode ?? "";
@@ -54,11 +55,22 @@ export const clockRenderer = (_snap: PulseSnapshot, item: Item): string => {
   return formatClock(Date.now(), fmt);
 };
 
+export const sandboxEnabledRenderer = (snap: PulseSnapshot, item: Item): string => {
+  const v = snap.claude_settings?.sandboxEnabled;
+  if (v === undefined) return "-";
+  const fmt = (item.options?.format ?? "sandbox_on_off") as string;
+  if (fmt === "sandbox_bool") return v ? "true" : "false";
+  if (fmt === "sandbox_icon") return v ? "🔒" : "🔓";
+  return v ? "on" : "off";
+};
+
 export const thinkingEffortRenderer = (snap: PulseSnapshot, item: Item): string => {
-  // Fall back to `xhigh` — Claude Code's official default — when we've
-  // never seen a `/model` echo in the transcript. Matches the user's
-  // actual effort setting in the common case where they never ran /model.
-  const level: ThinkingEffortLevel = snap.counters.thinking_effort ?? "xhigh";
+  // settings.json is authoritative — Claude Code writes it synchronously on
+  // /model or /effort. JSONL echo is a best-effort fallback for older
+  // sessions. When neither present → dash.
+  const level: ThinkingEffortLevel | undefined =
+    snap.claude_settings?.effortLevel ?? snap.counters.thinking_effort;
+  if (!level) return "-";
   if (!item.options?.dynamic_color) return level;
   return wrapPartial(level, {
     fg: THINKING_EFFORT_COLORS[level],

@@ -266,6 +266,7 @@ const RELATIVE_FORMATS = [
 const PERCENT_FORMATS = ["percent0", "percent1"] as const;
 const TOKENS_FORMATS = ["tokens_compact", "tokens_full"] as const;
 const INTEGER_FORMATS = ["integer", "compact"] as const;
+const SANDBOX_FORMATS = ["sandbox_on_off", "sandbox_bool", "sandbox_icon"] as const;
 
 export const ITEM_TYPE_DEFS: Record<ItemType, ItemTypeDef> = {
   model: { formats: [], supportsVariant: false },
@@ -408,6 +409,10 @@ export const ITEM_TYPE_DEFS: Record<ItemType, ItemTypeDef> = {
     formats: [],
     supportsVariant: false,
     supportsDynamicColor: true,
+  },
+  sandbox_enabled: {
+    formats: SANDBOX_FORMATS,
+    supportsVariant: false,
   },
   worktree: { formats: [], supportsVariant: false },
   worktree_branch: { formats: [], supportsVariant: false },
