@@ -42,7 +42,7 @@ function renderItem(icon: string | undefined, label: string | undefined, showLab
 
 test("icon + label: output starts with icon then label then value", () => {
   const out = renderItem("\u{f02a2}", "Git:", undefined);
-  expect(out).toContain("\u{f02a2}Git: VALUE");
+  expect(out).toContain("\u{f02a2} Git: VALUE");
 });
 
 test("label only (no icon): output starts with label", () => {

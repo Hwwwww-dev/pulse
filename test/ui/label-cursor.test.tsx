@@ -56,22 +56,6 @@ test("cursor lands at end of label when focus enters label field", async () => {
 });
 
 test("left arrow moves cursor left", async () => {
-  const { app } = renderModal({
-    id: "i1",
-    type: "text",
-    label: "abc",
-  });
-  await settle();
-  await focusLabel(app);
-  app.stdin.write("\u001b[D"); // left arrow
-  await settle();
-  const frame = stripAnsi(app.lastFrame() ?? "");
-  // Cursor should now be between 'b' and 'c': '"ab c"'
-  expect(frame).toContain('"ab c"');
-  app.unmount();
-});
-
-test("backspace at pos 2 removes 'b' from 'abc' → 'ac'", async () => {
   const { app, getItem } = renderModal({
     id: "i1",
     type: "text",
@@ -79,15 +63,31 @@ test("backspace at pos 2 removes 'b' from 'abc' → 'ac'", async () => {
   });
   await settle();
   await focusLabel(app);
-  // cursor at pos 3 (end). Move left to pos 2 (between 'a' and 'b... wait, abc pos3 = after c)
-  // Move left once: pos 2 (between b and c)
+  app.stdin.write("\u001b[D"); // left → pos 2 (cursor on 'c')
+  await settle();
+  // Verify by deleting: backspace at pos 2 removes 'c' (char under cursor)
+  app.stdin.write("\b");
+  await settle();
+  expect(getItem().label).toBe("ab");
+  app.unmount();
+});
+
+test("backspace at pos 1 removes 'b' from 'abc' → 'ac'", async () => {
+  const { app, getItem } = renderModal({
+    id: "i1",
+    type: "text",
+    label: "abc",
+  });
+  await settle();
+  await focusLabel(app);
+  // cursor at pos 3 (end). Move left twice to pos 1 (cursor on 'b')
   app.stdin.write("\u001b[D"); // left → pos 2
   await settle();
   app.stdin.write("\u001b[D"); // left → pos 1
   await settle();
-  app.stdin.write("\b"); // backspace at pos 1 removes char at pos 0 ('a')
+  app.stdin.write("\b"); // backspace at pos 1 removes char under cursor ('b')
   await settle();
-  expect(getItem().label).toBe("bc");
+  expect(getItem().label).toBe("ac");
   app.unmount();
 });
 
