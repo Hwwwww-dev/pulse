@@ -97,18 +97,19 @@ function setTextField(item: Item, field: "label" | "trailing_separator", value: 
 
 function formatTextField(value: string, active: boolean, cursorPos?: number): string {
   if (!active) return JSON.stringify(value);
-  // Inverse-video space acts as a block cursor so the user can see which
-  // field is currently accepting keystrokes.
-  const CURSOR = "\x1b[7m \x1b[27m";
+  const INV_ON = "\x1b[7m";
+  const INV_OFF = "\x1b[27m";
   if (cursorPos === undefined) {
-    // Append-only fields: cursor always at end
-    return `"${value}${CURSOR}"`;
+    return `"${value}${INV_ON} ${INV_OFF}"`;
   }
-  // Label with cursor at grapheme position
   const g = graphemes(value);
+  if (cursorPos >= g.length) {
+    return `"${value}${INV_ON} ${INV_OFF}"`;
+  }
   const before = g.slice(0, cursorPos).join("");
-  const after = g.slice(cursorPos).join("");
-  return `"${before}${CURSOR}${after}"`;
+  const curChar = g[cursorPos];
+  const after = g.slice(cursorPos + 1).join("");
+  return `"${before}${INV_ON}${curChar}${INV_OFF}${after}"`;
 }
 
 function initialFocusFieldIndex(fields: readonly FieldKey[]): number {
@@ -230,11 +231,6 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
     // need a way to launch the overlay without a binding collision.
     if (key.return) {
       if (activeField === "type") { setTypePickerOpen(true); return; }
-      if (activeField === "icon") {
-        iconBeforePickRef.current = item.icon;
-        setIconPickerOpen(true);
-        return;
-      }
       onClose();
       return;
     }
@@ -258,13 +254,14 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
       if (key.leftArrow) { setLabelCursor(Math.max(0, pos - 1)); return; }
       if (key.rightArrow) { setLabelCursor(Math.min(g.length, pos + 1)); return; }
       if (key.backspace || key.delete) {
-        if (key.backspace && pos > 0) {
-          const next = [...g.slice(0, pos - 1), ...g.slice(pos)].join("");
-          onChange(setTextField(item, "label", next));
-          setLabelCursor(pos - 1);
-        } else if (key.delete && pos < g.length) {
+        if (pos < g.length) {
           const next = [...g.slice(0, pos), ...g.slice(pos + 1)].join("");
           onChange(setTextField(item, "label", next));
+          if (pos > 0 && pos >= g.length - 1) setLabelCursor(pos - 1);
+        } else if (pos > 0) {
+          const next = g.slice(0, -1).join("");
+          onChange(setTextField(item, "label", next));
+          setLabelCursor(pos - 1);
         }
         return;
       }
@@ -592,7 +589,7 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
     React.createElement(
       Text,
       { key: "icon" },
-      `${marker("icon")} icon:         ${item.icon !== undefined ? item.icon : "(none)"}${activeField === "icon" ? "\x1b[7m \x1b[27m   [Enter/Space] pick · Backspace clear" : ""}`,
+      `${marker("icon")} icon:         ${item.icon !== undefined ? item.icon + " " : "(none)"}${activeField === "icon" ? "\x1b[7m \x1b[27m   [Space] pick · Backspace clear" : ""}`,
     ),
     React.createElement(
       Text,

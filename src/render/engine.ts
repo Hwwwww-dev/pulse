@@ -98,8 +98,12 @@ function renderItem(snap: PulseSnapshot, item: Item, theme: Theme | undefined): 
     const valueStyle = mergeStyle(themeStyle, itemStyle);
 
     // P0-2: Engine owns label assembly
-    // Icon sits flush against label; if no label, icon takes its place.
-    const effectiveLabel = (item.icon ?? "") + (item.label ?? "");
+    // Icon + space + label. The space compensates for Nerd Font PUA glyphs
+    // whose terminal width (2 cells) exceeds string-width's measurement (1),
+    // preventing adjacent label text from overwriting the glyph's 2nd cell.
+    // Only insert the spacer when both icon and label are present; when icon
+    // stands alone the label_separator already provides adequate padding.
+    const effectiveLabel = (item.icon ? item.icon + (item.label ? " " : "") : "") + (item.label ?? "");
     let styled: string;
     if (item.show_label === false || effectiveLabel === "") {
       styled = applyStyle(value, valueStyle);

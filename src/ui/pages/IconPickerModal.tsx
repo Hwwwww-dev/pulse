@@ -124,11 +124,12 @@ export function IconPickerModal({ current, onSelect, onCancel, onPreview }: Icon
     }
     const isSelected = rowIdx === safeCursor;
     const marker = isSelected ? "▸" : " ";
-    const name = row.icon!.name.padEnd(24);
     return React.createElement(
-      Text,
-      { key: `i:${row.icon!.name}`, inverse: isSelected },
-      `${marker} ${name}  ${row.icon!.glyph}`,
+      Box,
+      { key: `i:${row.icon!.name}` },
+      React.createElement(Text, { inverse: isSelected }, `${marker} `),
+      React.createElement(Text, { inverse: isSelected, bold: true }, `${row.icon!.glyph}  `),
+      React.createElement(Text, { inverse: isSelected, dimColor: !isSelected }, row.icon!.name),
     );
   });
 
