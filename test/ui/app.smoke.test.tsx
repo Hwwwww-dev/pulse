@@ -7,7 +7,6 @@ import { paths } from "../../src/core/paths.ts";
 import { stripAnsi } from "../../src/render/ansi.ts";
 
 beforeEach(async () => {
-  (Bun.env as Record<string, string>).HOME = `${Bun.env.TMPDIR ?? "/tmp"}/pulse-ui-test`;
   await rm(paths.root(), { recursive: true, force: true });
 });
 
@@ -42,7 +41,9 @@ test("editing text does not trigger global q/r/s hotkeys and updates preview liv
   // Default config's first item starts with label "Model:"; typing qrs
   // appends, so the edited label is "Model:qrs" — verifying both that
   // text input flowed through and that q/r/s didn't trip global hotkeys.
-  expect(frame).toContain('label:        "Model:qrs"');
+  // The active text field now renders an inverse-video cursor block
+  // before the closing quote, so assert on the stripped frame.
+  expect(stripAnsi(frame)).toContain('label:        "Model:qrs');
   // Strip ANSI before checking label+value adjacency (label and value now styled separately)
   expect(stripAnsi(frame)).toContain("Model:qrs Opus");
   expect(frame).toContain("Pulse");

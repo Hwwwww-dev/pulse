@@ -253,6 +253,12 @@ export interface PulseSnapshot {
   counters: SessionCounters;
   /** Git info; absent on failure */
   git?: GitInfo;
+  /** Ambient settings read from ~/.claude/settings.json; absent on failure */
+  claude_settings?: {
+    effortLevel?: ThinkingEffortLevel;
+    outputStyle?: string;
+    sandboxEnabled?: boolean;
+  };
 }
 
 // -----------------------------------------------------------

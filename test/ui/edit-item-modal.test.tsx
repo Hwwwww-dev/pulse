@@ -6,6 +6,7 @@ import { aggregate } from "../../src/core/aggregator.ts";
 import { EditItemModal } from "../../src/ui/pages/EditItemModal.tsx";
 import { emptyCounters } from "../../src/input/jsonl.ts";
 import { parseStdinPayload } from "../../src/input/stdin.ts";
+import { stripAnsi } from "../../src/render/ansi.ts";
 
 const parsed = parseStdinPayload(await Bun.file("test/fixtures/stdin/full.json").text());
 if (!parsed.ok) throw new Error("fixture broken");
@@ -71,7 +72,9 @@ test("EditItemModal accepts custom label input, show_label toggle, and trailing 
   await settle();
 
   let frame = app.lastFrame() ?? "";
-  expect(frame).toContain('label:        "ETA"');
+  // Active text field renders an inverse-video cursor block before the
+  // closing quote, so assert on the stripped frame with a prefix match.
+  expect(stripAnsi(frame)).toContain('label:        "ETA');
 
   app.stdin.write("\u001B[B");
   await settle();
@@ -87,7 +90,9 @@ test("EditItemModal accepts custom label input, show_label toggle, and trailing 
   await settle();
 
   frame = app.lastFrame() ?? "";
-  expect(frame).toContain('trailing_separator: " :: "');
+  // Active field has a trailing inverse-video cursor; compare against the
+  // stripped frame with a prefix match.
+  expect(stripAnsi(frame)).toContain('trailing_separator: " :: ');
 
   app.unmount();
 });
@@ -110,7 +115,12 @@ test("EditItemModal lets trailing_separator be cleared to an empty string", asyn
   await settle();
 
   const frame = app.lastFrame() ?? "";
-  expect(frame).toContain('trailing_separator: ""');
+  // trailing_separator is the active field, so its rendered value contains
+  // an inverse-video cursor sequence (a single space once stripped) between
+  // the quotes — confirming the underlying value is now empty, not " ".
+  const stripped = stripAnsi(frame);
+  expect(stripped).toContain('trailing_separator: " "');
+  expect(stripped).not.toContain('trailing_separator: "  "');
 
   app.unmount();
 });

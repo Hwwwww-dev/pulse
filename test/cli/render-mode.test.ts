@@ -7,7 +7,6 @@ import { paths } from "../../src/core/paths.ts";
 import { stripAnsi } from "../../src/render/ansi.ts";
 
 beforeEach(async () => {
-  (Bun.env as Record<string, string>).HOME = `${Bun.env.TMPDIR ?? "/tmp"}/pulse-rm-test`;
   await rm(paths.root(), { recursive: true, force: true });
 });
 

@@ -4,7 +4,6 @@ import { runGc } from "../../src/core/gc.ts";
 import { paths } from "../../src/core/paths.ts";
 
 beforeEach(async () => {
-  (Bun.env as Record<string, string>).HOME = `${Bun.env.TMPDIR ?? "/tmp"}/pulse-gc-test`;
   await rm(paths.root(), { recursive: true, force: true });
   await mkdir(paths.sessionsDir(), { recursive: true });
 });

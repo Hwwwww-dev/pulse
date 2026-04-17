@@ -92,8 +92,13 @@ function setTextField(item: Item, field: "label" | "trailing_separator", value: 
   return { ...item, trailing_separator: value };
 }
 
-function formatTextField(value: string): string {
-  return JSON.stringify(value);
+function formatTextField(value: string, active: boolean): string {
+  if (!active) return JSON.stringify(value);
+  // Inverse-video space acts as a block cursor so the user can see which
+  // field is currently accepting keystrokes. Placed before the closing
+  // quote to mimic an input-line caret.
+  const CURSOR = "\x1b[7m \x1b[27m";
+  return `"${value}${CURSOR}"`;
 }
 
 function initialFocusFieldIndex(fields: readonly FieldKey[]): number {
@@ -520,7 +525,7 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
     React.createElement(
       Text,
       { key: "label" },
-      `${marker("label")} label:        ${formatTextField(labelValue)}`,
+      `${marker("label")} label:        ${formatTextField(labelValue, activeField === "label")}`,
     ),
     React.createElement(
       Text,
@@ -530,12 +535,12 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
     React.createElement(
       Text,
       { key: "tsep" },
-      `${marker("trailing_separator")} trailing_separator: ${formatTextField(trailingSeparatorValue)}`,
+      `${marker("trailing_separator")} trailing_separator: ${formatTextField(trailingSeparatorValue, activeField === "trailing_separator")}`,
     ),
     React.createElement(
       Text,
       { key: "psep" },
-      `${marker("parts_separator")} parts_separator:    ${formatTextField((item.options?.parts_separator as string | undefined) ?? "")}`,
+      `${marker("parts_separator")} parts_separator:    ${formatTextField((item.options?.parts_separator as string | undefined) ?? "", activeField === "parts_separator")}`,
     ),
     ...(supportsFormat
       ? [React.createElement(
@@ -560,13 +565,15 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
       : []),
     ...extraTexts.map((t) => {
       const raw = ((item.options as Record<string, unknown> | undefined)?.[t.key] as string | undefined) ?? "";
-      const display = raw === "" && t.placeholder
+      const fk = `text:${t.key}` as FieldKey;
+      const isActive = activeField === fk;
+      const display = raw === "" && t.placeholder && !isActive
         ? `(empty — ${t.placeholder})`
-        : formatTextField(raw);
+        : formatTextField(raw, isActive);
       return React.createElement(
         Text,
         { key: `text:${t.key}` },
-        `${marker(`text:${t.key}` as FieldKey)} ${t.label}:${" ".repeat(Math.max(1, 14 - t.label.length - 1))}${display}`,
+        `${marker(fk)} ${t.label}:${" ".repeat(Math.max(1, 14 - t.label.length - 1))}${display}`,
       );
     }),
     ...extraFlags.map((f) => {
@@ -603,12 +610,12 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
     React.createElement(
       Text,
       { key: "margin_left" },
-      `${marker("margin_left")} margin_left:  ${formatTextField(item.margin_left ?? "")}`,
+      `${marker("margin_left")} margin_left:  ${formatTextField(item.margin_left ?? "", activeField === "margin_left")}`,
     ),
     React.createElement(
       Text,
       { key: "margin_right" },
-      `${marker("margin_right")} margin_right: ${formatTextField(item.margin_right ?? "")}`,
+      `${marker("margin_right")} margin_right: ${formatTextField(item.margin_right ?? "", activeField === "margin_right")}`,
     ),
     React.createElement(
       Box,

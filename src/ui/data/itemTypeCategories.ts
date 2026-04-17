@@ -16,7 +16,7 @@ export interface ItemTypeCategory {
 export const ITEM_TYPE_CATEGORIES: readonly ItemTypeCategory[] = [
   {
     name: "Identity",
-    types: ["model", "session_name", "session_id", "version", "output_style", "vim_mode", "thinking_effort"],
+    types: ["model", "session_name", "session_id", "version", "output_style", "vim_mode", "thinking_effort", "sandbox_enabled"],
   },
   {
     name: "Filesystem & Git",

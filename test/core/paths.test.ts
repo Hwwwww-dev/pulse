@@ -6,7 +6,7 @@ import { paths } from "../../src/core/paths.ts";
 // Paths are derived from os.homedir() + node:path.join so they resolve
 // correctly on Windows / macOS / Linux. These tests compare against the
 // runtime-resolved home rather than a hardcoded fixture.
-const HOME = homedir();
+const HOME = process.env.PULSE_HOME ?? homedir();
 
 test("root returns ~/.pulse", () => {
   expect(paths.root()).toBe(join(HOME, ".pulse"));

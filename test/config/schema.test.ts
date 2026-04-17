@@ -5,7 +5,6 @@ import { loadConfig, saveConfig } from "../../src/config/store.ts";
 import { paths } from "../../src/core/paths.ts";
 
 beforeEach(async () => {
-  (Bun.env as Record<string, string>).HOME = `${Bun.env.TMPDIR ?? "/tmp"}/pulse-config-test`;
   await rm(paths.root(), { recursive: true, force: true });
 });
 

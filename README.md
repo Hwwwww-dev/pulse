@@ -34,7 +34,11 @@ Context pressure, token burn, cost, rate limits, git state — glanceable at all
 
 ## 🔒 Offline
 
-> **Pulse runs fully offline.** No network calls, no telemetry, no API keys — it only reads the JSON payload Claude Code pipes on stdin and Claude Code's own session JSONL transcripts on your local disk.
+> **Pulse runs fully offline and 100% locally.** No network calls, no telemetry, no API keys — it only reads:
+>
+> - the JSON payload Claude Code pipes on stdin,
+> - Claude Code's own session JSONL transcripts on your local disk,
+> - Claude Code's user settings at `~/.claude/settings.json` (for ambient state like thinking effort, output style, sandbox mode).
 >
 > ⚠️ Because the **5-hour** and **weekly** rate-limit values come from that stdin payload, they refresh only when Claude Code pushes a new statusline tick — so they may lag slightly behind the live counters shown inside Claude Code itself.
 

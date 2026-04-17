@@ -7,7 +7,6 @@ import { parseStdinPayload } from "../../src/input/stdin.ts";
 import { paths } from "../../src/core/paths.ts";
 
 beforeEach(async () => {
-  (Bun.env as Record<string, string>).HOME = `${Bun.env.TMPDIR ?? "/tmp"}/pulse-cache-test`;
   await rm(paths.root(), { recursive: true, force: true });
 });
 

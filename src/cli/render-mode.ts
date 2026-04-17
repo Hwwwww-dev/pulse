@@ -1,6 +1,7 @@
 import { readStdinJson } from "../input/stdin.ts";
 import { parseJsonlIncremental, emptyCounters } from "../input/jsonl.ts";
 import { readGitInfo } from "../input/git.ts";
+import { readClaudeSettings } from "../input/claudeSettings.ts";
 import { aggregate } from "../core/aggregator.ts";
 import {
   writeCache,
@@ -60,11 +61,13 @@ function emptyClaudePayload(): ClaudeStdinPayload {
  * fresh context.
  */
 async function startupSnapshot(): Promise<PulseSnapshot> {
+  const settings = await readClaudeSettings().catch(() => ({}));
   const fallback: PulseSnapshot = {
     schema_version: 2,
     captured_at: Date.now(),
     claude: emptyClaudePayload(),
     counters: emptyCounters(),
+    claude_settings: settings,
   };
 
   try {
@@ -79,6 +82,8 @@ async function startupSnapshot(): Promise<PulseSnapshot> {
     // Zero out: cost, context_window, counters. Session identity is also
     // cleared so downstream carry-forward treats this as a fresh session.
     const empty = emptyClaudePayload();
+    const sameProject =
+      prior.claude.workspace.project_dir === empty.workspace.project_dir;
     const claude: ClaudeStdinPayload = {
       ...empty,
       cwd: prior.claude.cwd || empty.cwd,
@@ -93,8 +98,9 @@ async function startupSnapshot(): Promise<PulseSnapshot> {
       captured_at: Date.now(),
       claude,
       counters: emptyCounters(),
+      claude_settings: settings,
     };
-    if (prior.git) snap.git = prior.git;
+    if (sameProject && prior.git) snap.git = prior.git;
     return snap;
   } catch {
     return fallback;
@@ -109,7 +115,7 @@ export async function runRenderModeWithPayload(
     readSession(payload.session_id),
     findPriorSessionInProject(payload.session_id, payload.workspace.project_dir),
   ]);
-  const [jsonl, git] = await Promise.all([
+  const [jsonl, git, settings] = await Promise.all([
     config.jsonl.enabled
       ? parseJsonlIncremental(
           payload.transcript_path,
@@ -129,10 +135,11 @@ export async function runRenderModeWithPayload(
     config.git.enabled
       ? readGitInfo(payload.workspace.current_dir, config.git.timeout_ms).catch(() => undefined)
       : Promise.resolve(undefined),
+    readClaudeSettings().catch(() => ({})),
   ]);
 
   const effectiveClaude = carryForwardFromPrior(payload, prior, Date.now());
-  const snapshot = aggregate(effectiveClaude, jsonl.counters, git);
+  const snapshot = aggregate(effectiveClaude, jsonl.counters, git, settings);
   const text = renderSafe(snapshot, config);
 
   if (config.cache.enabled) {

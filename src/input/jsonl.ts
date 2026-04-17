@@ -53,8 +53,11 @@ function toNum(v: unknown): number {
 // `\u001b` text form (JSON.stringify escapes control chars) so the level
 // sits cleanly between plain words regardless of how the line reached us.
 const ANSI_SGR_REGEX = /(?:\x1b|\\u001b)\[[\d;]*m/gi;
+// Matches both `/model` echoes ("Set model to <X> with <level> effort") and
+// `/effort` echoes ("Set effort level to <level>: Deeper reasoning…"). Either
+// branch yields the level in group 1 or group 2 respectively.
 const THINKING_EFFORT_REGEX =
-  /Set model to[\s\S]*? with (low|medium|high|xhigh|max) effort/i;
+  /(?:Set model to[\s\S]*? with (low|medium|high|xhigh|max) effort|Set effort level to (low|medium|high|xhigh|max)\b)/i;
 
 export interface JsonlParseResult {
   counters: SessionCounters;
@@ -127,7 +130,8 @@ function consumeLine(counters: SessionCounters, line: string): void {
   // `\x1b[1mxhigh\x1b[22m`, which would otherwise break the regex anchor.
   const effortMatch = THINKING_EFFORT_REGEX.exec(line.replace(ANSI_SGR_REGEX, ""));
   if (effortMatch) {
-    counters.thinking_effort = effortMatch[1]!.toLowerCase() as ThinkingEffortLevel;
+    const level = (effortMatch[1] ?? effortMatch[2])!.toLowerCase();
+    counters.thinking_effort = level as ThinkingEffortLevel;
   }
 
   // Parse timestamp from entry (top-level field)
