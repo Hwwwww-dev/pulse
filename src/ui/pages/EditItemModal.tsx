@@ -40,6 +40,43 @@ type FieldKey =
   | `enum:${string}`
   | `num:${string}`
   | `text:${string}`;
+
+export type TabKey = "basics" | "appearance" | "advanced" | "color";
+
+export const TAB_ORDER: readonly TabKey[] = ["basics", "appearance", "advanced", "color"];
+
+const BASICS_SET = new Set<string>(["type", "name", "icon", "label", "show_label"]);
+const APPEARANCE_SET = new Set<string>([
+  "trailing_separator",
+  "parts_separator",
+  "format",
+  "display_mode",
+  "bar_style",
+  "margin_left",
+  "margin_right",
+]);
+
+export function partitionFields(fields: readonly string[]): Record<TabKey, readonly string[]> {
+  const basics: string[] = [];
+  const appearance: string[] = [];
+  const advanced: string[] = [];
+  const color: string[] = [];
+  for (const f of fields) {
+    if (BASICS_SET.has(f)) basics.push(f);
+    else if (APPEARANCE_SET.has(f)) appearance.push(f);
+    else if (f === "color") color.push(f);
+    else if (
+      f.startsWith("text:") ||
+      f.startsWith("flag:") ||
+      f.startsWith("num:") ||
+      f.startsWith("enum:")
+    ) {
+      advanced.push(f);
+    }
+  }
+  return { basics, appearance, advanced, color };
+}
+
 const ITEM_TYPES: readonly ItemType[] = ItemTypeSchema.options;
 
 // Types that require picking a specific name from the snapshot counters.
@@ -118,6 +155,16 @@ function initialFocusFieldIndex(fields: readonly FieldKey[]): number {
   const labelIndex = fields.indexOf("label");
   if (labelIndex >= 0) return labelIndex;
   return 0;
+}
+
+// Fields that accept arbitrary character input — the `?` shortcut must yield
+// to these so users can type a literal '?' when the field is focused.
+function isTextEntryField(f: FieldKey): boolean {
+  if (f === "label" || f === "name") return true;
+  if (f === "trailing_separator" || f === "parts_separator") return true;
+  if (f === "margin_left" || f === "margin_right") return true;
+  if (typeof f === "string" && f.startsWith("text:")) return true;
+  return false;
 }
 
 export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose, onCancel }: EditItemModalProps): React.ReactElement {
@@ -206,6 +253,15 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
   const [focus, setFocus] = useState<number>(() => initialFocusFieldIndex(FIELDS));
   const safeFocus = Math.min(focus, FIELDS.length - 1);
   const activeField = FIELDS[safeFocus] ?? "type";
+  const tabBuckets = partitionFields(FIELDS as readonly string[]);
+  const availableTabs = TAB_ORDER.filter((t) => tabBuckets[t].length > 0);
+  const [activeTab, setActiveTab] = useState<TabKey>("basics");
+  const safeActiveTab: TabKey = availableTabs.includes(activeTab) ? activeTab : (availableTabs[0] ?? "basics");
+  const tabFieldSet = new Set<string>(tabBuckets[safeActiveTab]);
+  const focusInTab = tabFieldSet.has(activeField as string);
+  const effectiveFocusField: FieldKey = focusInTab
+    ? activeField
+    : ((tabBuckets[safeActiveTab][0] ?? activeField) as FieldKey);
   // When the type picker overlay is open, the parent input handler must stay
   // inert so keys (search text, ↑↓, Enter) only reach the picker.
   const [typePickerOpen, setTypePickerOpen] = useState<boolean>(false);
@@ -215,29 +271,50 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
   const iconBeforePickRef = useRef<string | undefined>(undefined);
   // Label cursor: grapheme index, 0..g.length
   const [labelCursor, setLabelCursor] = useState<number>(0);
+  const [descExpanded, setDescExpanded] = useState<boolean>(false);
   // When focus transitions INTO label, reset cursor to end
   useEffect(() => {
-    if (activeField === "label") {
+    if (effectiveFocusField === "label") {
       setLabelCursor(graphemes(item.label ?? "").length);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeField]);
+  }, [effectiveFocusField]);
 
   useInput((input, key) => {
     if (typePickerOpen) return;
     if (iconPickerOpen) return;
     if (key.escape) { onCancel(); return; }
+    if (key.tab) {
+      if (availableTabs.length <= 1) return;
+      const idx = availableTabs.indexOf(safeActiveTab);
+      const safeIdx = idx < 0 ? 0 : idx;
+      const nextIdx = key.shift
+        ? (safeIdx - 1 + availableTabs.length) % availableTabs.length
+        : (safeIdx + 1) % availableTabs.length;
+      const nextTab = availableTabs[nextIdx]!;
+      setActiveTab(nextTab);
+      const firstField = tabBuckets[nextTab][0];
+      if (firstField) setFocus(FIELDS.indexOf(firstField as FieldKey));
+      return;
+    }
+    if (input === "?" && !key.ctrl && !key.meta && !isTextEntryField(effectiveFocusField)) {
+      // `?` toggles the type-description detail panel, but must yield to
+      // text-entry fields so users can literally type `?` in labels, names,
+      // separators, margins, and extra text options.
+      setDescExpanded((v) => !v);
+      return;
+    }
     // On the type field, Enter opens the picker instead of saving — users
     // need a way to launch the overlay without a binding collision.
     if (key.return) {
-      if (activeField === "type") { setTypePickerOpen(true); return; }
+      if (effectiveFocusField === "type") { setTypePickerOpen(true); return; }
       onClose();
       return;
     }
     if (key.upArrow) { setFocus((f) => (f - 1 + FIELDS.length) % FIELDS.length); return; }
     if (key.downArrow) { setFocus((f) => (f + 1) % FIELDS.length); return; }
 
-    if (activeField === "icon") {
+    if (effectiveFocusField === "icon") {
       if (input === " ") {
         iconBeforePickRef.current = item.icon;
         setIconPickerOpen(true);
@@ -247,7 +324,7 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
       return; // swallow other keys
     }
 
-    if (activeField === "label") {
+    if (effectiveFocusField === "label") {
       const labelVal = item.label ?? "";
       const g = graphemes(labelVal);
       const pos = labelCursor;
@@ -275,7 +352,7 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
       return;
     }
 
-    if (activeField === "trailing_separator") {
+    if (effectiveFocusField === "trailing_separator") {
       const current = textFieldValue(item, "trailing_separator");
       if (key.backspace || key.delete) {
         if (item.trailing_separator === undefined) {
@@ -295,7 +372,7 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
       }
     }
 
-    if (activeField === "type") {
+    if (effectiveFocusField === "type") {
       // Space also opens the picker — matches the "[Space] pick" hint and
       // gives users a single obvious key without competing with label text
       // entry on other fields.
@@ -311,7 +388,7 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
       }
     }
 
-    if (activeField === "name") {
+    if (effectiveFocusField === "name") {
       if (item.type === "tool_call") {
         const current = currentName(item) ?? "";
         if (key.backspace || key.delete) {
@@ -338,7 +415,7 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
       }
     }
 
-    if (activeField === "color") {
+    if (effectiveFocusField === "color") {
       if (key.leftArrow || key.rightArrow) {
         const cur = item.style?.color;
         const idx = cur ? PALETTE.indexOf(cur) : -1;
@@ -350,12 +427,12 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
       }
     }
 
-    if (activeField === "show_label" && input === " ") {
+    if (effectiveFocusField === "show_label" && input === " ") {
       onChange({ ...item, show_label: item.show_label === false ? true : false });
       return;
     }
 
-    if (activeField === "bar_style" && (key.leftArrow || key.rightArrow)) {
+    if (effectiveFocusField === "bar_style" && (key.leftArrow || key.rightArrow)) {
       const cur = (item.options?.bar_style as string | undefined) ?? "dingbat";
       const idx = BAR_STYLE_PRESETS.indexOf(cur as (typeof BAR_STYLE_PRESETS)[number]);
       const safeIdx = idx < 0 ? 0 : idx;
@@ -370,7 +447,7 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
       return;
     }
 
-    if (activeField === "display_mode" && (key.leftArrow || key.rightArrow || input === " ")) {
+    if (effectiveFocusField === "display_mode" && (key.leftArrow || key.rightArrow || input === " ")) {
       const cur = item.options?.display_mode ?? "used";
       const next = cur === "used" ? "remaining" : "used";
       const nextOptions = { ...(item.options ?? {}), display_mode: next } as Item["options"];
@@ -378,8 +455,8 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
       return;
     }
 
-    if (typeof activeField === "string" && activeField.startsWith("flag:") && input === " ") {
-      const flagKey = activeField.slice(5);
+    if (typeof effectiveFocusField === "string" && effectiveFocusField.startsWith("flag:") && input === " ") {
+      const flagKey = effectiveFocusField.slice(5);
       const raw = (item.options as Record<string, unknown> | undefined)?.[flagKey];
       const flagDef = allExtraFlags.find((f) => f.key === flagKey);
       const dflt = flagDef && "defaultValue" in flagDef ? Boolean(flagDef.defaultValue) : false;
@@ -393,13 +470,13 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
     }
 
     if (
-      typeof activeField === "string" &&
-      activeField.startsWith("num:") &&
+      typeof effectiveFocusField === "string" &&
+      effectiveFocusField.startsWith("num:") &&
       (key.leftArrow || key.rightArrow)
     ) {
       // FieldKey is `num:<key>` for scalars and `num:<key>#<idx>` for
       // array-backed sibling nums (e.g. color_ramp_stops[i]).
-      const rest = activeField.slice(4);
+      const rest = effectiveFocusField.slice(4);
       const hashAt = rest.indexOf("#");
       const numKey = hashAt < 0 ? rest : rest.slice(0, hashAt);
       const fieldArrayIdx = hashAt < 0 ? undefined : Number(rest.slice(hashAt + 1));
@@ -437,8 +514,8 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
       return;
     }
 
-    if (typeof activeField === "string" && activeField.startsWith("text:")) {
-      const textKey = activeField.slice(5);
+    if (typeof effectiveFocusField === "string" && effectiveFocusField.startsWith("text:")) {
+      const textKey = effectiveFocusField.slice(5);
       const optsRec = (item.options as Record<string, unknown> | undefined) ?? {};
       const current = (optsRec[textKey] as string | undefined) ?? "";
       if (key.backspace || key.delete) {
@@ -460,11 +537,11 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
     }
 
     if (
-      typeof activeField === "string" &&
-      activeField.startsWith("enum:") &&
+      typeof effectiveFocusField === "string" &&
+      effectiveFocusField.startsWith("enum:") &&
       (key.leftArrow || key.rightArrow)
     ) {
-      const enumKey = activeField.slice(5);
+      const enumKey = effectiveFocusField.slice(5);
       const def2 = extraEnums.find((e) => e.key === enumKey);
       if (!def2) return;
       const cur = ((item.options as Record<string, unknown> | undefined)?.[enumKey] as string | undefined) ?? def2.defaultValue;
@@ -481,7 +558,7 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
       return;
     }
 
-    if (activeField === "format" && supportsFormat && (key.leftArrow || key.rightArrow)) {
+    if (effectiveFocusField === "format" && supportsFormat && (key.leftArrow || key.rightArrow)) {
       const formats = def.formats;
       const cur = (item.options?.format as string | undefined) ?? "";
       const idx = formats.indexOf(cur);
@@ -495,8 +572,8 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
       return;
     }
 
-    if (activeField === "margin_left" || activeField === "margin_right") {
-      const key2 = activeField;
+    if (effectiveFocusField === "margin_left" || effectiveFocusField === "margin_right") {
+      const key2 = effectiveFocusField;
       const current = item[key2] ?? "";
       if (key.backspace || key.delete) {
         onChange({ ...item, [key2]: current.slice(0, -1) === "" ? undefined : current.slice(0, -1) });
@@ -508,7 +585,7 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
       }
     }
 
-    if (activeField === "parts_separator") {
+    if (effectiveFocusField === "parts_separator") {
       const opts = (item.options ?? {}) as Record<string, unknown>;
       const current = (opts.parts_separator as string | undefined) ?? "";
       if (key.backspace || key.delete) {
@@ -532,7 +609,7 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
 
   });
 
-  const marker = (f: FieldKey): string => (activeField === f ? "▸" : " ");
+  const marker = (f: FieldKey): string => (effectiveFocusField === f ? "▸" : " ");
   const doc = ITEM_TYPE_DESCRIPTIONS[item.type];
   const descSummary = doc?.summary ?? "";
   const descDetails = doc?.details ?? [];
@@ -547,12 +624,15 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
     ? " (no data in snapshot)"
     : "";
 
+  const tabHeader = availableTabs
+    .map((t) => (t === safeActiveTab ? `[${t}]` : ` ${t} `))
+    .join(" ");
   const children: React.ReactNode[] = [
-    React.createElement(Text, { key: "title", bold: true }, `Edit Item`),
+    React.createElement(Text, { key: "title", bold: true }, `Edit Item   ${tabHeader}`),
     React.createElement(
       Text,
       { key: "type" },
-      `${marker("type")} type:         ⟨ ${item.type} ⟩${activeField === "type" ? "   [Enter/Space] pick" : ""}`,
+      `${marker("type")} type:         ⟨ ${item.type} ⟩${effectiveFocusField === "type" ? "   [Enter/Space] pick" : ""}`,
     ),
     // Type description sits immediately under the type field so it's clearly
     // tied to the current selection. Summary first, then any detail lines
@@ -562,15 +642,17 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
           React.createElement(
             Text,
             { key: "desc-summary", dimColor: true },
-            `   ↳ ${descSummary}`,
+            `   ↳ ${descSummary}${descDetails.length > 0 ? (descExpanded ? "  [?] less" : "  [?] more") : ""}`,
           ),
-          ...descDetails.map((line, i) =>
-            React.createElement(
-              Text,
-              { key: `desc-detail-${i}`, dimColor: true },
-              `     ${line}`,
-            ),
-          ),
+          ...(descExpanded
+            ? descDetails.map((line, i) =>
+                React.createElement(
+                  Text,
+                  { key: `desc-detail-${i}`, dimColor: true },
+                  `     ${line}`,
+                ),
+              )
+            : []),
         ]
       : []),
   ];
@@ -589,12 +671,12 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
     React.createElement(
       Text,
       { key: "icon" },
-      `${marker("icon")} icon:         ${item.icon !== undefined ? item.icon + " " : "(none)"}${activeField === "icon" ? "\x1b[7m \x1b[27m   [Space] pick · Backspace clear" : ""}`,
+      `${marker("icon")} icon:         ${item.icon !== undefined ? item.icon + " " : "(none)"}${effectiveFocusField === "icon" ? "\x1b[7m \x1b[27m   [Space] pick · Backspace clear" : ""}`,
     ),
     React.createElement(
       Text,
       { key: "label" },
-      `${marker("label")} label:        ${formatTextField(labelValue, activeField === "label", activeField === "label" ? labelCursor : undefined)}`,
+      `${marker("label")} label:        ${formatTextField(labelValue, effectiveFocusField === "label", effectiveFocusField === "label" ? labelCursor : undefined)}`,
     ),
     React.createElement(
       Text,
@@ -604,12 +686,12 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
     React.createElement(
       Text,
       { key: "tsep" },
-      `${marker("trailing_separator")} trailing_separator: ${formatTextField(trailingSeparatorValue, activeField === "trailing_separator")}`,
+      `${marker("trailing_separator")} trailing_separator: ${formatTextField(trailingSeparatorValue, effectiveFocusField === "trailing_separator")}`,
     ),
     React.createElement(
       Text,
       { key: "psep" },
-      `${marker("parts_separator")} parts_separator:    ${formatTextField((item.options?.parts_separator as string | undefined) ?? "", activeField === "parts_separator")}`,
+      `${marker("parts_separator")} parts_separator:    ${formatTextField((item.options?.parts_separator as string | undefined) ?? "", effectiveFocusField === "parts_separator")}`,
     ),
     ...(supportsFormat
       ? [React.createElement(
@@ -635,7 +717,7 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
     ...extraTexts.map((t) => {
       const raw = ((item.options as Record<string, unknown> | undefined)?.[t.key] as string | undefined) ?? "";
       const fk = `text:${t.key}` as FieldKey;
-      const isActive = activeField === fk;
+      const isActive = effectiveFocusField === fk;
       const display = raw === "" && t.placeholder && !isActive
         ? `(empty — ${t.placeholder})`
         : formatTextField(raw, isActive);
@@ -679,12 +761,12 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
     React.createElement(
       Text,
       { key: "margin_left" },
-      `${marker("margin_left")} margin_left:  ${formatTextField(item.margin_left ?? "", activeField === "margin_left")}`,
+      `${marker("margin_left")} margin_left:  ${formatTextField(item.margin_left ?? "", effectiveFocusField === "margin_left")}`,
     ),
     React.createElement(
       Text,
       { key: "margin_right" },
-      `${marker("margin_right")} margin_right: ${formatTextField(item.margin_right ?? "", activeField === "margin_right")}`,
+      `${marker("margin_right")} margin_right: ${formatTextField(item.margin_right ?? "", effectiveFocusField === "margin_right")}`,
     ),
     React.createElement(
       Box,
@@ -700,9 +782,29 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
     React.createElement(
       Text,
       { key: "help", dimColor: true },
-      " ↑↓ field · type text / ←→ change · Shift+←→ big step · Backspace delete · space toggle · [Enter] save · [Esc] cancel",
+      " ↑↓ field · [Tab/⇧Tab] section · ←→ change (⇧ big) · space toggle · ? detail · Enter save · Esc cancel",
     ),
   );
+
+  const KEEP_ALWAYS = new Set<string>(["title", "help"]);
+  const fieldKeyFromReactKey = (k: string | null): string | null => {
+    if (!k) return null;
+    if (k === "showlabel") return "show_label";
+    if (k === "tsep") return "trailing_separator";
+    if (k === "psep") return "parts_separator";
+    return k;
+  };
+  const filteredChildren = children.filter((node) => {
+    if (!React.isValidElement(node)) return true;
+    const key = (node as React.ReactElement).key;
+    const keyStr = typeof key === "string" ? key : null;
+    if (!keyStr) return true;
+    if (KEEP_ALWAYS.has(keyStr)) return true;
+    if (keyStr.startsWith("desc-")) return safeActiveTab === "basics";
+    const f = fieldKeyFromReactKey(keyStr);
+    if (f === null) return true;
+    return tabFieldSet.has(f);
+  });
 
   if (typePickerOpen) {
     // Render the picker overlay standalone — its own useInput owns the
@@ -740,6 +842,6 @@ export function EditItemModal({ item, snapshot, theme: _theme, onChange, onClose
   return React.createElement(
     Box,
     { flexDirection: "column", borderStyle: "round", paddingX: 1 },
-    ...children,
+    ...filteredChildren,
   );
 }
