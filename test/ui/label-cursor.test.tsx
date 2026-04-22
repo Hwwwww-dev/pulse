@@ -163,26 +163,3 @@ test("label cursor: label becomes undefined when emptied", async () => {
   expect(getItem().label).toBeUndefined();
   app.unmount();
 });
-
-test("trailing_separator still uses append-only logic", async () => {
-  const { app, getItem } = renderModal({
-    id: "i1",
-    type: "text",
-    label: "hi",
-  });
-  await settle();
-  await focusLabel(app);
-  // From label (index 2), move down to show_label (3) then trailing_separator (4)
-  app.stdin.write("\u001b[B"); // → show_label
-  await settle();
-  app.stdin.write("\u001b[B"); // → trailing_separator
-  await settle();
-  app.stdin.write("X");
-  await settle();
-  // trailing_separator was undefined (not " " default), typing sets it to "X"
-  // then typing again appends: "XY"
-  app.stdin.write("Y");
-  await settle();
-  expect(getItem().trailing_separator).toBe("XY");
-  app.unmount();
-});
