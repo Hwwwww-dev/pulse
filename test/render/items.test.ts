@@ -354,6 +354,19 @@ test("thinking_effort: settings.effortLevel wins over counters.thinking_effort",
   expect(out).toBe("high");
 });
 
+test("thinking_effort: stdin claude.effort.level wins over settings and counters", () => {
+  const triple = {
+    ...snap,
+    claude: { ...snap.claude, effort: { level: "xhigh" as const } },
+    claude_settings: { effortLevel: "high" as const },
+    counters: { ...snap.counters, thinking_effort: "low" as const },
+  };
+  const out = stripAnsi(
+    RENDERERS.thinking_effort(triple, { id: "t", type: "thinking_effort" }),
+  );
+  expect(out).toBe("xhigh");
+});
+
 test("thinking_effort falls back to JSONL counter when settings missing", () => {
   const bare = { ...snap };
   delete (bare as { claude_settings?: unknown }).claude_settings;
@@ -445,6 +458,88 @@ test("sandbox_enabled: sandbox_icon format", () => {
     }),
   );
   expect(out).toBe("🔓");
+});
+
+test("thinking: returns '-' when stdin field absent", () => {
+  const bare = { ...snap, claude: { ...snap.claude } };
+  delete (bare.claude as { thinking?: unknown }).thinking;
+  const out = stripAnsi(
+    RENDERERS.thinking(bare, { id: "t", type: "thinking" }),
+  );
+  expect(out).toBe("-");
+});
+
+test("thinking: default format 'on'/'off'", () => {
+  const on = { ...snap, claude: { ...snap.claude, thinking: { enabled: true } } };
+  const off = { ...snap, claude: { ...snap.claude, thinking: { enabled: false } } };
+  expect(
+    stripAnsi(RENDERERS.thinking(on, { id: "t", type: "thinking" })),
+  ).toBe("on");
+  expect(
+    stripAnsi(RENDERERS.thinking(off, { id: "t", type: "thinking" })),
+  ).toBe("off");
+});
+
+test("thinking: thinking_bool format", () => {
+  const on = { ...snap, claude: { ...snap.claude, thinking: { enabled: true } } };
+  const out = stripAnsi(
+    RENDERERS.thinking(on, {
+      id: "t",
+      type: "thinking",
+      options: { format: "thinking_bool" },
+    }),
+  );
+  expect(out).toBe("true");
+});
+
+test("thinking: thinking_icon format", () => {
+  const on = { ...snap, claude: { ...snap.claude, thinking: { enabled: true } } };
+  const off = { ...snap, claude: { ...snap.claude, thinking: { enabled: false } } };
+  expect(
+    stripAnsi(
+      RENDERERS.thinking(on, { id: "t", type: "thinking", options: { format: "thinking_icon" } }),
+    ),
+  ).toBe("💭");
+  expect(
+    stripAnsi(
+      RENDERERS.thinking(off, { id: "t", type: "thinking", options: { format: "thinking_icon" } }),
+    ),
+  ).toBe("💤");
+});
+
+test("fast_mode: returns '-' when stdin field absent", () => {
+  const bare = { ...snap, claude: { ...snap.claude } };
+  delete (bare.claude as { fast_mode?: unknown }).fast_mode;
+  const out = stripAnsi(
+    RENDERERS.fast_mode(bare, { id: "t", type: "fast_mode" }),
+  );
+  expect(out).toBe("-");
+});
+
+test("fast_mode: default format 'on'/'off'", () => {
+  const on = { ...snap, claude: { ...snap.claude, fast_mode: true } };
+  const off = { ...snap, claude: { ...snap.claude, fast_mode: false } };
+  expect(
+    stripAnsi(RENDERERS.fast_mode(on, { id: "t", type: "fast_mode" })),
+  ).toBe("on");
+  expect(
+    stripAnsi(RENDERERS.fast_mode(off, { id: "t", type: "fast_mode" })),
+  ).toBe("off");
+});
+
+test("fast_mode: fast_mode_icon format", () => {
+  const on = { ...snap, claude: { ...snap.claude, fast_mode: true } };
+  const off = { ...snap, claude: { ...snap.claude, fast_mode: false } };
+  expect(
+    stripAnsi(
+      RENDERERS.fast_mode(on, { id: "t", type: "fast_mode", options: { format: "fast_mode_icon" } }),
+    ),
+  ).toBe("⚡");
+  expect(
+    stripAnsi(
+      RENDERERS.fast_mode(off, { id: "t", type: "fast_mode", options: { format: "fast_mode_icon" } }),
+    ),
+  ).toBe("🐢");
 });
 
 test("thresholdColor returns undefined when dynamic_color is off", () => {

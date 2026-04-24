@@ -72,6 +72,11 @@ const Payload = z.object({
   vim: z.object({ mode: z.enum(["NORMAL", "INSERT"]) }).optional(),
   agent: z.object({ name: z.string() }).optional(),
   worktree: Worktree,
+  // Surfaced by Claude Code ≥ 2.1.119: effort level, extended-thinking
+  // toggle, fast-mode toggle. All optional for older CC versions.
+  effort: z.object({ level: z.enum(["low", "medium", "high", "xhigh", "max"]) }).optional(),
+  thinking: z.object({ enabled: z.boolean() }).optional(),
+  fast_mode: z.boolean().optional(),
 });
 
 export type ParseResult =

@@ -157,8 +157,8 @@ export const ITEM_TYPE_DESCRIPTIONS: Record<ItemType, ItemTypeDoc> = {
   thinking_effort: {
     summary: "Thinking effort level (low / medium / high / xhigh / max).",
     details: [
-      "Priority: ~/.claude/settings.json → /model & /effort JSONL echoes → '-'.",
-      "dynamic_color: gray → yellow → orange → blue → red; max is bold.",
+      "Priority: stdin effort.level → ~/.claude/settings.json → JSONL echoes → '-'.",
+      "dynamic_color: amber → green → blue → violet; max is a per-char random rainbow + bold (reshuffles each refresh).",
     ],
   },
   sandbox_enabled: {
@@ -166,6 +166,20 @@ export const ITEM_TYPE_DESCRIPTIONS: Record<ItemType, ItemTypeDoc> = {
     details: [
       "Formats: sandbox_on_off → on/off (default), sandbox_bool → true/false, sandbox_icon → 🔒/🔓.",
       "Displays `-` when sandbox field is absent from settings.json.",
+    ],
+  },
+  thinking: {
+    summary: "Extended-thinking toggle from the active Claude Code session.",
+    details: [
+      "Formats: thinking_on_off → on/off (default), thinking_bool → true/false, thinking_icon → 💭/💤.",
+      "Displays `-` on Claude Code < 2.1.119 (field absent).",
+    ],
+  },
+  fast_mode: {
+    summary: "Fast-mode toggle from the active Claude Code session.",
+    details: [
+      "Formats: fast_mode_on_off → on/off (default), fast_mode_bool → true/false, fast_mode_icon → ⚡/🐢.",
+      "Displays `-` on Claude Code < 2.1.119 (field absent).",
     ],
   },
   worktree: {
