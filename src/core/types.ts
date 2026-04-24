@@ -124,6 +124,15 @@ export interface ClaudeStdinPayload {
     /** Original branch before entering worktree; may be absent for hook-based */
     original_branch?: string;
   };
+
+  /** Thinking effort level. Surfaced by Claude Code ≥ 2.1.119 directly on stdin. */
+  effort?: { level: ThinkingEffortLevel };
+
+  /** Extended-thinking toggle. Surfaced by Claude Code ≥ 2.1.119. */
+  thinking?: { enabled: boolean };
+
+  /** Fast-mode toggle. Surfaced by Claude Code ≥ 2.1.119. */
+  fast_mode?: boolean;
 }
 
 // -----------------------------------------------------------

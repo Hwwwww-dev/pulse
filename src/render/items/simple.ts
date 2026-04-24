@@ -3,15 +3,29 @@ import type { Item } from "../../config/schema.ts";
 import { formatClock, type ClockFormat } from "../format.ts";
 import { wrapPartial } from "../ansi.ts";
 
-// Effort ladder: gray → yellow → orange → blue → red. Applied only when
-// `dynamic_color` is on. `max` additionally renders bold to stand out.
+// Effort ladder mirrors Claude Code's Speed↔Intelligence slider:
+// low=amber, medium=green, high=blue, xhigh=violet. `max` instead
+// paints each character with a random hue from MAX_RAINBOW_POOL + bold,
+// so the word reshuffles colors on every statusline refresh — mimicking
+// the multi-hue shimmer of the slider's rightmost stop.
+// Applied only when `dynamic_color` is on.
 const THINKING_EFFORT_COLORS: Record<ThinkingEffortLevel, string> = {
-  low: "#808080",
-  medium: "#FFCB6B",
-  high: "#FF9B3F",
-  xhigh: "#4A9EFF",
-  max: "#FF3B3B",
+  low: "#FFCB6B",
+  medium: "#98BB6C",
+  high: "#7E9CD8",
+  xhigh: "#A78BFA",
+  max: "#A78BFA",
 };
+const MAX_RAINBOW_POOL = [
+  "#E06C75", // red
+  "#E5C07B", // yellow
+  "#98C379", // green
+  "#56B6C2", // cyan
+  "#61AFEF", // blue
+  "#C678DD", // purple
+  "#D19A66", // orange
+  "#FF6699", // pink
+] as const;
 
 // Dead code removal: modelRenderer simplified (show_context_size ternary was always base)
 export const modelRenderer = (snap: PulseSnapshot, _item: Item): string =>
@@ -64,16 +78,42 @@ export const sandboxEnabledRenderer = (snap: PulseSnapshot, item: Item): string 
   return v ? "on" : "off";
 };
 
+export const thinkingRenderer = (snap: PulseSnapshot, item: Item): string => {
+  const v = snap.claude.thinking?.enabled;
+  if (v === undefined) return "-";
+  const fmt = (item.options?.format ?? "thinking_on_off") as string;
+  if (fmt === "thinking_bool") return v ? "true" : "false";
+  if (fmt === "thinking_icon") return v ? "💭" : "💤";
+  return v ? "on" : "off";
+};
+
+export const fastModeRenderer = (snap: PulseSnapshot, item: Item): string => {
+  const v = snap.claude.fast_mode;
+  if (v === undefined) return "-";
+  const fmt = (item.options?.format ?? "fast_mode_on_off") as string;
+  if (fmt === "fast_mode_bool") return v ? "true" : "false";
+  if (fmt === "fast_mode_icon") return v ? "⚡" : "🐢";
+  return v ? "on" : "off";
+};
+
 export const thinkingEffortRenderer = (snap: PulseSnapshot, item: Item): string => {
-  // settings.json is authoritative — Claude Code writes it synchronously on
-  // /model or /effort. JSONL echo is a best-effort fallback for older
-  // sessions. When neither present → dash.
+  // stdin `effort.level` is the freshest source (Claude Code ≥ 2.1.119,
+  // updated synchronously on /model or /effort). Fall back to settings.json
+  // then JSONL echo for older CC versions. Dash when nothing is available.
   const level: ThinkingEffortLevel | undefined =
-    snap.claude_settings?.effortLevel ?? snap.counters.thinking_effort;
+    snap.claude.effort?.level
+    ?? snap.claude_settings?.effortLevel
+    ?? snap.counters.thinking_effort;
   if (!level) return "-";
   if (!item.options?.dynamic_color) return level;
-  return wrapPartial(level, {
-    fg: THINKING_EFFORT_COLORS[level],
-    bold: level === "max",
-  });
+  if (level === "max") {
+    // Per-character random rainbow. Each refresh reshuffles.
+    return [..."max"]
+      .map((ch) => {
+        const c = MAX_RAINBOW_POOL[Math.floor(Math.random() * MAX_RAINBOW_POOL.length)]!;
+        return wrapPartial(ch, { fg: c, bold: true });
+      })
+      .join("");
+  }
+  return wrapPartial(level, { fg: THINKING_EFFORT_COLORS[level] });
 };

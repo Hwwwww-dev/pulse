@@ -267,6 +267,8 @@ const PERCENT_FORMATS = ["percent0", "percent1"] as const;
 const TOKENS_FORMATS = ["tokens_compact", "tokens_full"] as const;
 const INTEGER_FORMATS = ["integer", "compact"] as const;
 const SANDBOX_FORMATS = ["sandbox_on_off", "sandbox_bool", "sandbox_icon"] as const;
+const THINKING_FORMATS = ["thinking_on_off", "thinking_bool", "thinking_icon"] as const;
+const FAST_MODE_FORMATS = ["fast_mode_on_off", "fast_mode_bool", "fast_mode_icon"] as const;
 
 export const ITEM_TYPE_DEFS: Record<ItemType, ItemTypeDef> = {
   model: { formats: [], supportsVariant: false },
@@ -412,6 +414,14 @@ export const ITEM_TYPE_DEFS: Record<ItemType, ItemTypeDef> = {
   },
   sandbox_enabled: {
     formats: SANDBOX_FORMATS,
+    supportsVariant: false,
+  },
+  thinking: {
+    formats: THINKING_FORMATS,
+    supportsVariant: false,
+  },
+  fast_mode: {
+    formats: FAST_MODE_FORMATS,
     supportsVariant: false,
   },
   worktree: { formats: [], supportsVariant: false },

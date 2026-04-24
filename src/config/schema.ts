@@ -33,6 +33,8 @@ export const ItemTypeSchema = z.enum([
   "output_style",
   "vim_mode",
   "thinking_effort",
+  "thinking",
+  "fast_mode",
   "sandbox_enabled",
   "worktree",
   "worktree_branch",
@@ -104,6 +106,12 @@ export const FormatSchema = z.enum([
   "sandbox_on_off",
   "sandbox_bool",
   "sandbox_icon",
+  "thinking_on_off",
+  "thinking_bool",
+  "thinking_icon",
+  "fast_mode_on_off",
+  "fast_mode_bool",
+  "fast_mode_icon",
 ]);
 
 const BarThresholdSchema = z.object({

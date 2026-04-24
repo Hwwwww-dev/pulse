@@ -14,6 +14,8 @@ import {
   spacerRenderer,
   clockRenderer,
   thinkingEffortRenderer,
+  thinkingRenderer,
+  fastModeRenderer,
   sandboxEnabledRenderer,
 } from "./simple.ts";
 import { cwdRenderer, projectDirRenderer } from "./paths.ts";
@@ -131,6 +133,8 @@ export const RENDERERS: Record<ItemType, ItemRenderer> = {
   output_style: outputStyleRenderer,
   vim_mode: vimModeRenderer,
   thinking_effort: thinkingEffortRenderer,
+  thinking: thinkingRenderer,
+  fast_mode: fastModeRenderer,
   sandbox_enabled: sandboxEnabledRenderer,
   worktree: worktreeRenderer,
   worktree_branch: worktreeBranchRenderer,
