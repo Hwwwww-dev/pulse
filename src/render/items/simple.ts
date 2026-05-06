@@ -5,9 +5,10 @@ import { wrapPartial } from "../ansi.ts";
 
 // Effort ladder mirrors Claude Code's Speed↔Intelligence slider:
 // low=amber, medium=green, high=blue, xhigh=violet. `max` instead
-// paints each character with a random hue from MAX_RAINBOW_POOL + bold,
-// so the word reshuffles colors on every statusline refresh — mimicking
-// the multi-hue shimmer of the slider's rightmost stop.
+// paints each character with a *distinct* random hue from
+// MAX_RAINBOW_POOL + bold (partial Fisher–Yates, no repeats), so the
+// word reshuffles colors on every statusline refresh — mimicking the
+// multi-hue shimmer of the slider's rightmost stop.
 // Applied only when `dynamic_color` is on.
 const THINKING_EFFORT_COLORS: Record<ThinkingEffortLevel, string> = {
   low: "#FFCB6B",
@@ -107,13 +108,16 @@ export const thinkingEffortRenderer = (snap: PulseSnapshot, item: Item): string 
   if (!level) return "-";
   if (!item.options?.dynamic_color) return level;
   if (level === "max") {
-    // Per-character random rainbow. Each refresh reshuffles.
-    return [..."max"]
-      .map((ch) => {
-        const c = MAX_RAINBOW_POOL[Math.floor(Math.random() * MAX_RAINBOW_POOL.length)]!;
-        return wrapPartial(ch, { fg: c, bold: true });
-      })
-      .join("");
+    // Per-character random rainbow with *no color repeats*. Partial
+    // Fisher–Yates: pick `chars.length` distinct hues from the pool,
+    // reshuffled on every refresh.
+    const chars = [..."max"];
+    const pool = [...MAX_RAINBOW_POOL];
+    for (let i = 0; i < chars.length; i++) {
+      const j = i + Math.floor(Math.random() * (pool.length - i));
+      [pool[i], pool[j]] = [pool[j]!, pool[i]!];
+    }
+    return chars.map((ch, i) => wrapPartial(ch, { fg: pool[i]!, bold: true })).join("");
   }
   return wrapPartial(level, { fg: THINKING_EFFORT_COLORS[level] });
 };

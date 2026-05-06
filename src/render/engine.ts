@@ -67,7 +67,12 @@ function padToWidth(value: string, width: number, align: "left" | "right"): stri
 // Stable widths removed: layout is allowed to jump as digits flip in/out.
 // Users can still opt in per-item via options.min_width.
 
-function renderItem(snap: PulseSnapshot, item: Item, theme: Theme | undefined): string | null {
+function renderItem(
+  snap: PulseSnapshot,
+  item: Item,
+  themeStyle: TextStyleInput | undefined,
+  styleMode: "fg" | "bg",
+): string | null {
   try {
     const renderer = RENDERERS[item.type];
     let value = renderer(snap, item);
@@ -83,11 +88,9 @@ function renderItem(snap: PulseSnapshot, item: Item, theme: Theme | undefined): 
     }
 
     const labelOverride = LABEL_STYLE_OVERRIDES[item.type]?.(snap, item);
-    // `color` → fg (classic) or bg (powerline) depends on the active
-    // theme. Every caller of applyStyle / wrapPartial still speaks
-    // fg/bg directly — translation happens at this boundary only.
-    const styleMode: "fg" | "bg" = theme?.powerline ? "bg" : "fg";
-    const themeStyle = toAnsiStyle(theme?.defaults.itemStyle, styleMode);
+    // styleMode + themeStyle are precomputed once per line by the caller
+    // (`color` → fg in classic themes, → bg in powerline). Passing them
+    // through skips a per-item toAnsiStyle(theme.defaults.itemStyle).
     const itemStyle = toAnsiStyle(item.style, styleMode);
     const labelStyle = toAnsiStyle(item.label_style, styleMode);
 
@@ -142,6 +145,12 @@ function renderLine(snap: PulseSnapshot, line: Line, fallbackSep: string, theme:
   const bgSuffix = bgPrefix ? "\x1b[49m" : "";
   const defaultSep = line.separator ?? fallbackSep;
 
+  // Hoist theme-default style computation out of the per-item loop —
+  // it's invariant across the line and was previously recomputed inside
+  // renderItem on every iteration.
+  const styleMode: "fg" | "bg" = "fg";
+  const themeStyle = toAnsiStyle(theme?.defaults.itemStyle, styleMode);
+
   // Single-pass: render each item, track its trailing separator, emit bgPrefix
   // before each item and before each separator so line bg survives item-level
   // resets (sequential single-param SGRs). Layout: bgPrefix item (bgPrefix sep bgPrefix item)* bgSuffix
@@ -150,7 +159,7 @@ function renderLine(snap: PulseSnapshot, line: Line, fallbackSep: string, theme:
   let first = true;
 
   for (const item of line.items) {
-    const text = renderItem(snap, item, theme);
+    const text = renderItem(snap, item, themeStyle, styleMode);
     if (text === null) continue;
     if (first) {
       result = bgPrefix + text;
@@ -179,6 +188,11 @@ function renderPowerlineLine(
   level: ColorLevel,
 ): string {
   const padding = " ".repeat(Math.max(0, pl.padding ?? 1));
+
+  // Each slot is rendered in "fg mode" (the slot bg is painted by the
+  // outer powerline loop, the inner content carries pl.fg as foreground).
+  // Hoist the resulting themeStyle out of the loop — it's invariant.
+  const fgThemeStyle = toAnsiStyle(theme.defaults.itemStyle, "fg");
 
   // Pre-render all visible slots so we know their assigned bg before
   // building transitions. Hidden items don't consume a palette slot so
@@ -224,12 +238,10 @@ function renderPowerlineLine(
       margin_left: "",
       margin_right: "",
     };
-    // Render the item in "fg mode" (color → fg). We do that by passing
-    // a shim theme without the powerline flag so toAnsiStyle resolves
-    // `color` as a foreground. The outer loop then paints the bg on
-    // top of the result.
-    const fgTheme: Theme = { name: theme.name, defaults: theme.defaults };
-    const rawText = renderItem(snap, forced, fgTheme);
+    // Render the item in "fg mode" (color → fg). The slot bg is painted
+    // by the outer powerline loop, while inner content carries pl.fg as
+    // foreground via fgThemeStyle.
+    const rawText = renderItem(snap, forced, fgThemeStyle, "fg");
     if (rawText === null) continue;
     // Inside a slot, `renderItem` may emit multiple applyStyle segments
     // (label + value) as well as sub-part wraps (bar fg toggles). Each
@@ -237,8 +249,13 @@ function renderPowerlineLine(
     // (bg reset) — that drops the slot bg and shows black gaps between
     // label/value and inside bars. Re-inject the slot bg after every
     // `\x1b[49m` so the ribbon stays solid across every SGR boundary.
+    // Short-circuit: if the rendered text contains no \x1b[49m there is
+    // nothing to patch, so skip the full-string replaceAll scan.
     const bgC = bgCode(bg, level);
-    const text = rawText.replaceAll("\x1b[49m", `\x1b[49m${bgC}`);
+    const text =
+      rawText.indexOf("\x1b[49m") >= 0
+        ? rawText.replaceAll("\x1b[49m", `\x1b[49m${bgC}`)
+        : rawText;
     slots.push({ bg, text });
   }
 

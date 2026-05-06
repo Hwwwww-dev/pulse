@@ -1,6 +1,6 @@
 import { readStdinJson } from "../input/stdin.ts";
 import { parseJsonlIncremental, emptyCounters } from "../input/jsonl.ts";
-import { readGitInfo } from "../input/git.ts";
+import { readGitInfoCached } from "../input/git.ts";
 import { readClaudeSettings } from "../input/claudeSettings.ts";
 import { aggregate } from "../core/aggregator.ts";
 import {
@@ -107,10 +107,17 @@ async function startupSnapshot(): Promise<PulseSnapshot> {
   }
 }
 
-export async function runRenderModeWithPayload(
+/**
+ * Internal render core. Returns the rendered text plus a `persist` thunk
+ * that writes session/index/general cache files. Splitting this out lets
+ * the top-level CLI flow flush stdout *before* paying the cache-write
+ * cost (refreshInterval=1 active mode), while library callers / tests
+ * can still await full persistence via {@link runRenderModeWithPayload}.
+ */
+async function renderCore(
   payload: ClaudeStdinPayload,
   config: PulseConfig,
-): Promise<string> {
+): Promise<{ text: string; persist: () => Promise<void> }> {
   const [existing, prior] = await Promise.all([
     readSession(payload.session_id),
     findPriorSessionInProject(payload.session_id, payload.workspace.project_dir),
@@ -133,7 +140,11 @@ export async function runRenderModeWithPayload(
           },
         }),
     config.git.enabled
-      ? readGitInfo(payload.workspace.current_dir, config.git.timeout_ms).catch(() => undefined)
+      ? readGitInfoCached(
+          payload.workspace.current_dir,
+          config.git.timeout_ms,
+          config.git.cache_ttl_ms ?? 1000,
+        ).catch(() => undefined)
       : Promise.resolve(undefined),
     readClaudeSettings().catch(() => ({})),
   ]);
@@ -142,14 +153,26 @@ export async function runRenderModeWithPayload(
   const snapshot = aggregate(effectiveClaude, jsonl.counters, git, settings);
   const text = renderSafe(snapshot, config);
 
-  if (config.cache.enabled) {
+  const persist = async (): Promise<void> => {
+    if (!config.cache.enabled) return;
     try {
       await writeCache(snapshot, jsonl.cursor);
     } catch {
       // best-effort
     }
-  }
+  };
 
+  return { text, persist };
+}
+
+export async function runRenderModeWithPayload(
+  payload: ClaudeStdinPayload,
+  config: PulseConfig,
+): Promise<string> {
+  const { text, persist } = await renderCore(payload, config);
+  // Library / test callers await full persistence so on-disk cache
+  // files are observable when this returns.
+  await persist();
   return text;
 }
 
@@ -164,8 +187,14 @@ export async function runRenderMode(): Promise<void> {
     process.stdout.write(`${renderSafe(snap, config)}\n`);
     return;
   }
-  const text = await runRenderModeWithPayload(stdin.data, config);
+
+  const { text, persist } = await renderCore(stdin.data, config);
   process.stdout.write(`${text}\n`);
+  // Active-refresh mode (Claude Code refreshInterval=1) spawns pulse on
+  // every frame. Cache writes are 1–10ms of disk I/O that the parent
+  // doesn't need to wait for — let stdout flush, then keep persisting in
+  // the background while the bun event loop drains.
+  void persist().catch(() => {});
 
   if (Math.random() < 0.01 && config.cache.enabled) {
     runGc({ gcAfterDays: config.cache.gc_after_days, now: Date.now() }).catch(() => {});

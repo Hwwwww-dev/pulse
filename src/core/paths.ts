@@ -21,4 +21,6 @@ export const paths = {
   logFile: (): string => join(home(), ".pulse", "pulse.log"),
   commandCacheFile: (hash: string): string =>
     join(home(), ".pulse", ".cache", "cmd", `${hash}.json`),
+  gitCacheFile: (hash: string): string =>
+    join(home(), ".pulse", ".cache", "git", `${hash}.json`),
 };

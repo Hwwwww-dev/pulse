@@ -367,6 +367,38 @@ test("thinking_effort: stdin claude.effort.level wins over settings and counters
   expect(out).toBe("xhigh");
 });
 
+test("thinking_effort: max paints each character with a *distinct* color", () => {
+  const origColorTerm = Bun.env.COLORTERM;
+  (Bun.env as Record<string, string>).COLORTERM = "truecolor";
+  (globalThis as { __resetColorLevelForTests?: () => void }).__resetColorLevelForTests?.();
+
+  const maxSnap = {
+    ...snap,
+    claude: { ...snap.claude, effort: { level: "max" as const } },
+  };
+
+  try {
+    // Probabilistic: with the buggy independent-pick implementation, P(no
+    // collision across 3 picks from 8) = 8*7*6 / 8^3 ≈ 0.656 per call,
+    // so 100 trials would have caught a regression with prob > 1 − 0.656^100.
+    for (let i = 0; i < 100; i++) {
+      const out = RENDERERS.thinking_effort(maxSnap, {
+        id: "t",
+        type: "thinking_effort",
+        options: { dynamic_color: true },
+      });
+      expect(stripAnsi(out)).toBe("max");
+      const fgs = [...out.matchAll(/\x1b\[38;2;\d+;\d+;\d+m/g)].map((m) => m[0]);
+      expect(fgs.length).toBe(3);
+      expect(new Set(fgs).size).toBe(3);
+    }
+  } finally {
+    if (origColorTerm !== undefined) (Bun.env as Record<string, string>).COLORTERM = origColorTerm;
+    else delete (Bun.env as Record<string, string | undefined>).COLORTERM;
+    (globalThis as { __resetColorLevelForTests?: () => void }).__resetColorLevelForTests?.();
+  }
+});
+
 test("thinking_effort falls back to JSONL counter when settings missing", () => {
   const bare = { ...snap };
   delete (bare as { claude_settings?: unknown }).claude_settings;
