@@ -5,6 +5,7 @@ import { aggregate } from "../../src/core/aggregator.ts";
 import { emptyCounters } from "../../src/input/jsonl.ts";
 import { parseStdinPayload } from "../../src/input/stdin.ts";
 import { stripAnsi } from "../../src/render/ansi.ts";
+import { __resetMaxRollingForTests } from "../../src/render/items/simple.ts";
 import type { Item } from "../../src/config/schema.ts";
 
 const full = parseStdinPayload(await Bun.file("test/fixtures/stdin/full.json").text());
@@ -371,6 +372,7 @@ test("thinking_effort: max paints each character with a *distinct* color", () =>
   const origColorTerm = Bun.env.COLORTERM;
   (Bun.env as Record<string, string>).COLORTERM = "truecolor";
   (globalThis as { __resetColorLevelForTests?: () => void }).__resetColorLevelForTests?.();
+  __resetMaxRollingForTests();
 
   const maxSnap = {
     ...snap,
@@ -378,9 +380,10 @@ test("thinking_effort: max paints each character with a *distinct* color", () =>
   };
 
   try {
-    // Probabilistic: with the buggy independent-pick implementation, P(no
-    // collision across 3 picks from 8) = 8*7*6 / 8^3 ≈ 0.656 per call,
-    // so 100 trials would have caught a regression with prob > 1 − 0.656^100.
+    // Invariant: every frame must show 3 distinct colors. The rolling
+    // animation enforces this (head color is drawn from pool minus the
+    // two kept colors, kept colors are distinct by induction from the
+    // seeded first frame).
     for (let i = 0; i < 100; i++) {
       const out = RENDERERS.thinking_effort(maxSnap, {
         id: "t",
@@ -396,6 +399,45 @@ test("thinking_effort: max paints each character with a *distinct* color", () =>
     if (origColorTerm !== undefined) (Bun.env as Record<string, string>).COLORTERM = origColorTerm;
     else delete (Bun.env as Record<string, string | undefined>).COLORTERM;
     (globalThis as { __resetColorLevelForTests?: () => void }).__resetColorLevelForTests?.();
+    __resetMaxRollingForTests();
+  }
+});
+
+test("thinking_effort: max colors *roll right* across frames (ABC -> DAB -> EDA)", () => {
+  const origColorTerm = Bun.env.COLORTERM;
+  (Bun.env as Record<string, string>).COLORTERM = "truecolor";
+  (globalThis as { __resetColorLevelForTests?: () => void }).__resetColorLevelForTests?.();
+  __resetMaxRollingForTests();
+
+  const maxSnap = {
+    ...snap,
+    claude: { ...snap.claude, effort: { level: "max" as const } },
+  };
+  const opt = { id: "t", type: "thinking_effort" as const, options: { dynamic_color: true } };
+  const colorsOf = (s: string) => [...s.matchAll(/\x1b\[38;2;\d+;\d+;\d+m/g)].map((m) => m[0]);
+
+  try {
+    let prev = colorsOf(RENDERERS.thinking_effort(maxSnap, opt));
+    expect(prev.length).toBe(3);
+    // Probabilistic on `head` choice (5+ candidates each step), but the
+    // shift-right invariant is deterministic — verify it for many frames
+    // to also catch any state-corruption regression.
+    for (let i = 0; i < 50; i++) {
+      const next = colorsOf(RENDERERS.thinking_effort(maxSnap, opt));
+      expect(next.length).toBe(3);
+      // Shift-right: next[1] === prev[0], next[2] === prev[1].
+      expect(next[1]).toBe(prev[0]!);
+      expect(next[2]).toBe(prev[1]!);
+      // Head color must not collide with the two kept colors.
+      expect(next[0]).not.toBe(next[1]!);
+      expect(next[0]).not.toBe(next[2]!);
+      prev = next;
+    }
+  } finally {
+    if (origColorTerm !== undefined) (Bun.env as Record<string, string>).COLORTERM = origColorTerm;
+    else delete (Bun.env as Record<string, string | undefined>).COLORTERM;
+    (globalThis as { __resetColorLevelForTests?: () => void }).__resetColorLevelForTests?.();
+    __resetMaxRollingForTests();
   }
 });
 
