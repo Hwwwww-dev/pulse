@@ -13,12 +13,19 @@ const CARRY_FORWARD_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
  * stats when Claude Code has zeroed them on --resume.
  *
  * Semantics (conservative — current wins unless clearly zeroed):
- *  - If `prior` is missing OR older than CARRY_FORWARD_WINDOW_MS → passthrough.
+ *  - If `prior` is missing OR older than CARRY_FORWARD_WINDOW_MS → cumulative
+ *    fields pass through from current. rate_limits may still be enriched from
+ *    `accountRateLimits` (account-level, cross-window).
  *  - For each cumulative field: use current when it is non-zero; otherwise fall
  *    back to prior. This preserves user data on resume without inflating stats
  *    for unrelated sessions.
- *  - rate_limits: if current is absent, carry prior's entry provided its
- *    resets_at (unix seconds) is still in the future; otherwise drop.
+ *  - rate_limits priority (highest first):
+ *      1. current.rate_limits (this frame's stdin)
+ *      2. accountRateLimits (general.json — written by every pulse instance,
+ *         so a window in project Y sees the limits a window in project X just
+ *         received from the API)
+ *      3. prior.rate_limits (same-project session) when its resets_at is
+ *         still in the future
  *  - Other fields (model, session_id, cwd, etc.) are passed through from current.
  *
  * Returns a NEW object; never mutates inputs.
@@ -27,9 +34,18 @@ export function carryForwardFromPrior(
   current: ClaudeStdinPayload,
   prior: SessionCacheFile | undefined,
   nowMs: number,
+  accountRateLimits?: ClaudeStdinPayload["rate_limits"],
 ): ClaudeStdinPayload {
-  if (!prior) return current;
-  if (nowMs - prior.last_updated_at > CARRY_FORWARD_WINDOW_MS) return current;
+  if (!prior || nowMs - prior.last_updated_at > CARRY_FORWARD_WINDOW_MS) {
+    // No same-project carry-forward, but still try to enrich rate_limits from
+    // the account-level cache so multiple Claude Code windows stay consistent.
+    const merged = mergeRateLimits(current.rate_limits, undefined, accountRateLimits, nowMs);
+    if (merged === current.rate_limits) return current;
+    return {
+      ...current,
+      ...(merged !== undefined ? { rate_limits: merged } : {}),
+    };
+  }
 
   const p = prior.snapshot.claude;
   const cw = current.context_window;
@@ -66,7 +82,12 @@ export function carryForwardFromPrior(
     total_lines_removed: fallback(c.total_lines_removed, pc.total_lines_removed),
   };
 
-  const mergedRateLimits = mergeRateLimits(current.rate_limits, p.rate_limits, nowMs);
+  const mergedRateLimits = mergeRateLimits(
+    current.rate_limits,
+    p.rate_limits,
+    accountRateLimits,
+    nowMs,
+  );
 
   return {
     ...current,
@@ -76,23 +97,37 @@ export function carryForwardFromPrior(
   };
 }
 
+/**
+ * Pick rate-limit windows from up to three sources, per axis (five_hour /
+ * seven_day). Priority: current frame > account-level > same-project prior.
+ * `account` reflects the latest value any pulse instance has seen, so
+ * multi-window setups stay consistent even when the foreground window
+ * hasn't issued an API call recently.
+ */
 function mergeRateLimits(
   current: ClaudeStdinPayload["rate_limits"],
   prior: ClaudeStdinPayload["rate_limits"],
+  account: ClaudeStdinPayload["rate_limits"],
   nowMs: number,
 ): ClaudeStdinPayload["rate_limits"] | undefined {
   const nowSec = Math.floor(nowMs / 1000);
   const pickWindow = (
     cur: { used_percentage: number; resets_at: number } | undefined,
+    acc: { used_percentage: number; resets_at: number } | undefined,
     pri: { used_percentage: number; resets_at: number } | undefined,
   ): { used_percentage: number; resets_at: number } | undefined => {
     if (cur !== undefined) return cur;
+    if (acc !== undefined && acc.resets_at > nowSec) return acc;
     if (pri !== undefined && pri.resets_at > nowSec) return pri;
     return undefined;
   };
-  const five = pickWindow(current?.five_hour, prior?.five_hour);
-  const seven = pickWindow(current?.seven_day, prior?.seven_day);
-  if (five === undefined && seven === undefined) return current;
+  const five = pickWindow(current?.five_hour, account?.five_hour, prior?.five_hour);
+  const seven = pickWindow(current?.seven_day, account?.seven_day, prior?.seven_day);
+  if (five === undefined && seven === undefined) {
+    // Nothing to merge — preserve the original reference so the caller can
+    // detect "unchanged" via identity instead of a deep compare.
+    return current;
+  }
   return {
     ...(five !== undefined ? { five_hour: five } : {}),
     ...(seven !== undefined ? { seven_day: seven } : {}),

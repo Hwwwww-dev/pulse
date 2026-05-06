@@ -158,3 +158,86 @@ test("carryForwardFromPrior: current rate_limits takes precedence over prior", (
   const out = carryForwardFromPrior(cur, prior, now);
   expect(out.rate_limits?.five_hour?.used_percentage).toBe(42);
 });
+
+// ─── account-level rate_limits (general.json fallback) ─────────────────────
+
+test("carryForwardFromPrior: account rate_limits fill in when current is missing", () => {
+  // Multi-window scenario: this window (project Y) hasn't issued a request
+  // recently so current.rate_limits is undefined. Another window already
+  // wrote fresh values to general.json — we should pick those up.
+  const now = Date.now();
+  const cur = makePayload(); // no rate_limits
+  const prior = makePrior(makePayload({ session_id: "prev-1" })); // also no rate_limits
+  const account = {
+    five_hour: { used_percentage: 73, resets_at: Math.floor(now / 1000) + 3600 },
+    seven_day: { used_percentage: 51, resets_at: Math.floor(now / 1000) + 86400 },
+  };
+  const out = carryForwardFromPrior(cur, prior, now, account);
+  expect(out.rate_limits?.five_hour?.used_percentage).toBe(73);
+  expect(out.rate_limits?.seven_day?.used_percentage).toBe(51);
+});
+
+test("carryForwardFromPrior: current rate_limits beat account fallback", () => {
+  const now = Date.now();
+  const cur = makePayload({
+    rate_limits: {
+      five_hour: { used_percentage: 10, resets_at: Math.floor(now / 1000) + 100 },
+    },
+  });
+  const account = {
+    five_hour: { used_percentage: 99, resets_at: Math.floor(now / 1000) + 9999 },
+  };
+  const out = carryForwardFromPrior(cur, makePrior(makePayload({ session_id: "p" })), now, account);
+  expect(out.rate_limits?.five_hour?.used_percentage).toBe(10);
+});
+
+test("carryForwardFromPrior: account beats prior when prior is older same-project value", () => {
+  const now = Date.now();
+  const cur = makePayload(); // no rate_limits
+  const prior = makePrior(
+    makePayload({
+      session_id: "prev-1",
+      rate_limits: {
+        five_hour: { used_percentage: 30, resets_at: Math.floor(now / 1000) + 3600 },
+      },
+    }),
+  );
+  // Account-level (cross-window) saw a newer value
+  const account = {
+    five_hour: { used_percentage: 88, resets_at: Math.floor(now / 1000) + 3600 },
+  };
+  const out = carryForwardFromPrior(cur, prior, now, account);
+  // Account wins — prior is only the third-priority fallback.
+  expect(out.rate_limits?.five_hour?.used_percentage).toBe(88);
+});
+
+test("carryForwardFromPrior: account fallback works even with stale prior (> 15min)", () => {
+  // Edge case: same-project prior is too old, so the function would normally
+  // bail out on the early-return path. Account-level rate_limits should still
+  // be merged in — multi-window consistency must not depend on a recent
+  // same-project session.
+  const now = Date.now();
+  const stalePrior = makePrior(makePayload({ session_id: "prev-old" }));
+  stalePrior.last_updated_at = now - 30 * 60 * 1000; // 30 min ago
+  const cur = makePayload(); // zeroed; no rate_limits
+  const account = {
+    seven_day: { used_percentage: 64, resets_at: Math.floor(now / 1000) + 86400 },
+  };
+  const out = carryForwardFromPrior(cur, stalePrior, now, account);
+  expect(out.rate_limits?.seven_day?.used_percentage).toBe(64);
+  // Cumulative fields still come from current (stale prior remains ignored).
+  expect(out.cost.total_cost_usd).toBe(0);
+});
+
+test("carryForwardFromPrior: expired account rate_limits are not used", () => {
+  // resets_at in the past → account value is stale; should fall through to
+  // the next fallback layer (or stay undefined).
+  const now = Date.now();
+  const cur = makePayload();
+  const prior = makePrior(makePayload({ session_id: "p" }));
+  const account = {
+    five_hour: { used_percentage: 99, resets_at: Math.floor(now / 1000) - 3600 },
+  };
+  const out = carryForwardFromPrior(cur, prior, now, account);
+  expect(out.rate_limits?.five_hour).toBeUndefined();
+});

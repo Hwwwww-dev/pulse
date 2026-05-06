@@ -8,6 +8,7 @@ import {
   readSession,
   findPriorSessionInProject,
   readIndex,
+  readGeneral,
 } from "../core/cache.ts";
 import { carryForwardFromPrior } from "../core/carryForward.ts";
 import { runGc } from "../core/gc.ts";
@@ -118,9 +119,15 @@ async function renderCore(
   payload: ClaudeStdinPayload,
   config: PulseConfig,
 ): Promise<{ text: string; persist: () => Promise<void> }> {
-  const [existing, prior] = await Promise.all([
+  // general.json carries the most recent rate_limits any pulse instance
+  // has seen — including ones written by Claude Code windows in *other*
+  // projects. Fed into carryForwardFromPrior so multi-window setups don't
+  // diverge: a quiet window in project Y can show the limits a busy
+  // window in project X just received from the API.
+  const [existing, prior, general] = await Promise.all([
     readSession(payload.session_id),
     findPriorSessionInProject(payload.session_id, payload.workspace.project_dir),
+    readGeneral(),
   ]);
   const [jsonl, git, settings] = await Promise.all([
     config.jsonl.enabled
@@ -149,7 +156,12 @@ async function renderCore(
     readClaudeSettings().catch(() => ({})),
   ]);
 
-  const effectiveClaude = carryForwardFromPrior(payload, prior, Date.now());
+  const effectiveClaude = carryForwardFromPrior(
+    payload,
+    prior,
+    Date.now(),
+    general?.rate_limits,
+  );
   const snapshot = aggregate(effectiveClaude, jsonl.counters, git, settings);
   const text = renderSafe(snapshot, config);
 
