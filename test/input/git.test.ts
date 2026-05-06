@@ -1,5 +1,9 @@
 import { test, expect, beforeAll, afterAll, beforeEach } from "bun:test";
-import { readGitInfo, readGitInfoCached } from "../../src/input/git.ts";
+import {
+  readGitInfo,
+  readGitInfoCached,
+  __resetGitMemCacheForTests,
+} from "../../src/input/git.ts";
 import { rm, mkdir } from "fs/promises";
 import { paths } from "../../src/core/paths.ts";
 
@@ -47,6 +51,10 @@ beforeEach(async () => {
   // state so cached negative results don't leak across test ordering.
   await rm(PULSE_HOME, { recursive: true, force: true });
   Bun.env.PULSE_HOME = PULSE_HOME;
+  // The in-process Map cache is the same module-instance across tests in
+  // a file, so reset it too — otherwise a hot entry from a prior test
+  // would suppress the disk read we're trying to validate here.
+  __resetGitMemCacheForTests();
   await Bun.spawn(["git", "checkout", "--", "a.txt"], {
     cwd: REPO,
     stdout: "ignore",

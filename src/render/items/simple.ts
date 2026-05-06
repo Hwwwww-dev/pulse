@@ -5,10 +5,13 @@ import { wrapPartial } from "../ansi.ts";
 
 // Effort ladder mirrors Claude Code's Speed↔Intelligence slider:
 // low=amber, medium=green, high=blue, xhigh=violet. `max` instead
-// paints each character with a *distinct* random hue from
-// MAX_RAINBOW_POOL + bold (partial Fisher–Yates, no repeats), so the
-// word reshuffles colors on every statusline refresh — mimicking the
-// multi-hue shimmer of the slider's rightmost stop.
+// paints each character with a *distinct* hue from MAX_RAINBOW_POOL +
+// bold, and *rolls* those hues right by one slot on every refresh:
+// frame N+1 keeps frame N's first (chars-1) colors but shifts them
+// rightward, drawing a fresh head color from the pool that isn't equal
+// to either of the kept colors. So `max` -> ABC, DAB, EDA, ...
+// (visual shimmer flowing leftward). First frame seeds with a partial
+// Fisher–Yates shuffle so the initial state is already varied.
 // Applied only when `dynamic_color` is on.
 const THINKING_EFFORT_COLORS: Record<ThinkingEffortLevel, string> = {
   low: "#FFCB6B",
@@ -27,6 +30,24 @@ const MAX_RAINBOW_POOL = [
   "#D19A66", // orange
   "#FF6699", // pink
 ] as const;
+
+// Module-level state for the rolling animation. Single renderer per
+// process is fine — there is one statusline. State is cleared whenever
+// the rendered effort level is not `max`, so toggling away and back
+// reseeds with a fresh Fisher–Yates shuffle rather than continuing the
+// previous shimmer mid-stream.
+let prevMaxColors: readonly string[] | null = null;
+
+/**
+ * Test-only: reset the rolling animation state so consecutive tests
+ * don't bleed into each other. Lives behind a named export rather than
+ * being attached to globalThis — production code never imports it, so
+ * tree-shaking keeps it out of any consumer bundle that doesn't reach
+ * for it.
+ */
+export function __resetMaxRollingForTests(): void {
+  prevMaxColors = null;
+}
 
 // Dead code removal: modelRenderer simplified (show_context_size ternary was always base)
 export const modelRenderer = (snap: PulseSnapshot, _item: Item): string =>
@@ -107,17 +128,35 @@ export const thinkingEffortRenderer = (snap: PulseSnapshot, item: Item): string 
     ?? snap.counters.thinking_effort;
   if (!level) return "-";
   if (!item.options?.dynamic_color) return level;
-  if (level === "max") {
-    // Per-character random rainbow with *no color repeats*. Partial
-    // Fisher–Yates: pick `chars.length` distinct hues from the pool,
-    // reshuffled on every refresh.
-    const chars = [..."max"];
-    const pool = [...MAX_RAINBOW_POOL];
-    for (let i = 0; i < chars.length; i++) {
-      const j = i + Math.floor(Math.random() * (pool.length - i));
-      [pool[i], pool[j]] = [pool[j]!, pool[i]!];
-    }
-    return chars.map((ch, i) => wrapPartial(ch, { fg: pool[i]!, bold: true })).join("");
+  if (level !== "max") {
+    // Reset rolling state so re-entering `max` later starts from a
+    // freshly seeded frame instead of continuing mid-shimmer.
+    prevMaxColors = null;
+    return wrapPartial(level, { fg: THINKING_EFFORT_COLORS[level] });
   }
-  return wrapPartial(level, { fg: THINKING_EFFORT_COLORS[level] });
+  {
+    const chars = [..."max"];
+    let colors: string[];
+    if (prevMaxColors && prevMaxColors.length === chars.length) {
+      // Roll right: keep the first (n-1) colors of the previous frame,
+      // shift them one slot right, then draw a new head color that
+      // isn't equal to either of the kept (still-in-use) colors.
+      const kept = prevMaxColors.slice(0, chars.length - 1);
+      const inUse = new Set(kept);
+      const candidates = MAX_RAINBOW_POOL.filter((c) => !inUse.has(c));
+      const head = candidates[Math.floor(Math.random() * candidates.length)]!;
+      colors = [head, ...kept];
+    } else {
+      // First frame: partial Fisher–Yates picks `chars.length` distinct
+      // hues so the seed state is already varied.
+      const pool = [...MAX_RAINBOW_POOL];
+      for (let i = 0; i < chars.length; i++) {
+        const j = i + Math.floor(Math.random() * (pool.length - i));
+        [pool[i], pool[j]] = [pool[j]!, pool[i]!];
+      }
+      colors = pool.slice(0, chars.length);
+    }
+    prevMaxColors = colors;
+    return chars.map((ch, i) => wrapPartial(ch, { fg: colors[i]!, bold: true })).join("");
+  }
 };

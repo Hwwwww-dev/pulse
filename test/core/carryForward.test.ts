@@ -144,7 +144,11 @@ test("carryForwardFromPrior: stale prior (> 15min old) is ignored", () => {
   expect(out.cost.total_cost_usd).toBe(0);
 });
 
-test("carryForwardFromPrior: current rate_limits takes precedence over prior", () => {
+test("carryForwardFromPrior: newer window (larger resets_at) wins regardless of source", () => {
+  // Window rollover: prior cached the new 5h window's first reading
+  // (low usage, far-future resets_at) before stdin caught up. The
+  // stdin still carries the previous window's terminal value with a
+  // smaller resets_at — so prior wins on freshness.
   const now = Date.now();
   const cur = makePayload({
     rate_limits: { five_hour: { used_percentage: 42, resets_at: Math.floor(now / 1000) + 100 } },
@@ -156,7 +160,26 @@ test("carryForwardFromPrior: current rate_limits takes precedence over prior", (
     }),
   );
   const out = carryForwardFromPrior(cur, prior, now);
-  expect(out.rate_limits?.five_hour?.used_percentage).toBe(42);
+  expect(out.rate_limits?.five_hour?.used_percentage).toBe(1);
+  expect(out.rate_limits?.five_hour?.resets_at).toBe(Math.floor(now / 1000) + 9999);
+});
+
+test("carryForwardFromPrior: same resets_at — higher used_percentage wins", () => {
+  // Within a single 5h window, used_percentage only grows. Two readings
+  // with the same resets_at mean the same window — the larger usage
+  // is the more recent observation.
+  const now = Date.now();
+  const cur = makePayload({
+    rate_limits: { five_hour: { used_percentage: 30, resets_at: Math.floor(now / 1000) + 1000 } },
+  });
+  const prior = makePrior(
+    makePayload({
+      session_id: "prev-1",
+      rate_limits: { five_hour: { used_percentage: 50, resets_at: Math.floor(now / 1000) + 1000 } },
+    }),
+  );
+  const out = carryForwardFromPrior(cur, prior, now);
+  expect(out.rate_limits?.five_hour?.used_percentage).toBe(50);
 });
 
 // ─── account-level rate_limits (general.json fallback) ─────────────────────
@@ -177,7 +200,13 @@ test("carryForwardFromPrior: account rate_limits fill in when current is missing
   expect(out.rate_limits?.seven_day?.used_percentage).toBe(51);
 });
 
-test("carryForwardFromPrior: current rate_limits beat account fallback", () => {
+test("carryForwardFromPrior: stale stdin loses to fresher account (multi-window core case)", () => {
+  // Multi-window scenario the v0.6.11 fix targets: the foreground window's
+  // CC process is holding a *cached* old rate_limits (its last API call's
+  // response), while a sibling window already pushed a fresher value to
+  // general.json after a more recent API hit. Prior to the lex-order fix
+  // current always won and the foreground window kept showing the stale
+  // numbers — now `account` wins on freshness.
   const now = Date.now();
   const cur = makePayload({
     rate_limits: {
@@ -188,7 +217,27 @@ test("carryForwardFromPrior: current rate_limits beat account fallback", () => {
     five_hour: { used_percentage: 99, resets_at: Math.floor(now / 1000) + 9999 },
   };
   const out = carryForwardFromPrior(cur, makePrior(makePayload({ session_id: "p" })), now, account);
-  expect(out.rate_limits?.five_hour?.used_percentage).toBe(10);
+  expect(out.rate_limits?.five_hour?.used_percentage).toBe(99);
+});
+
+test("carryForwardFromPrior: same resets_at across all sources — fresher used_percentage wins", () => {
+  // Steady-state mid-window: cur/account/prior all share resets_at; pick
+  // the largest used_percentage. Account being slightly ahead is the
+  // common shape (a sibling window just observed a tick).
+  const now = Date.now();
+  const r = Math.floor(now / 1000) + 1000;
+  const cur = makePayload({
+    rate_limits: { five_hour: { used_percentage: 40, resets_at: r } },
+  });
+  const account = { five_hour: { used_percentage: 55, resets_at: r } };
+  const prior = makePrior(
+    makePayload({
+      session_id: "p",
+      rate_limits: { five_hour: { used_percentage: 38, resets_at: r } },
+    }),
+  );
+  const out = carryForwardFromPrior(cur, prior, now, account);
+  expect(out.rate_limits?.five_hour?.used_percentage).toBe(55);
 });
 
 test("carryForwardFromPrior: account beats prior when prior is older same-project value", () => {

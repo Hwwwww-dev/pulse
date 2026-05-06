@@ -106,6 +106,15 @@ async function writeGitCache(entry: GitCacheEntry): Promise<void> {
 }
 
 /**
+ * In-process hot cache. The disk cache is the cross-process source of
+ * truth (each pulse spawn rebuilds this Map), but within a single
+ * process — tests, library callers, anything that calls more than once
+ * — we'd otherwise keep paying a disk read per call. The Map is
+ * authoritative whenever populated for the same TTL window.
+ */
+const memGitCache = new Map<string, GitCacheEntry>();
+
+/**
  * Disk-TTL-cached git status. Returns `undefined` on persistent failure
  * (spawn error, not a repo) just like {@link readGitInfo}, but caches that
  * negative result too — otherwise non-repo cwds would spawn git every frame.
@@ -120,17 +129,39 @@ export async function readGitInfoCached(
   if (cacheTtlMs <= 0) return readGitInfo(cwd, timeoutMs);
 
   const now = Date.now();
+
+  // Fast path: in-process Map hit. Avoids a disk read per call within
+  // one process and — critically — keeps fire-and-forget disk writes
+  // observable to the very next call without waiting for the rename
+  // to settle.
+  const mem = memGitCache.get(cwd);
+  if (mem && now - mem.cached_at <= cacheTtlMs) return mem.info ?? undefined;
+
   const cached = await readGitCache(cwd);
   if (cached && now - cached.cached_at <= cacheTtlMs) {
+    memGitCache.set(cwd, cached);
     return cached.info ?? undefined;
   }
 
   const fresh = await readGitInfo(cwd, timeoutMs);
-  // Await the write so a follow-up frame within TTL can rely on the file
-  // existing. Net cost is still a huge win vs the 50–200ms git spawn we
-  // just paid: ~1ms of cache I/O is dwarfed by every reused future frame.
-  // Errors are swallowed — a missing cache file simply means the next
-  // call falls back to a fresh spawn.
-  await writeGitCache({ cached_at: now, cwd, info: fresh ?? null }).catch(() => {});
+  const entry: GitCacheEntry = { cached_at: now, cwd, info: fresh ?? null };
+  memGitCache.set(cwd, entry);
+  // Fire-and-forget the disk write so we don't block stdout flush on
+  // cold/expired-TTL frames. The active-refresh perf path is built on
+  // disk I/O happening AFTER stdout drains; awaiting here would defeat
+  // that on exactly the frame that just paid the git-spawn cost. Bun
+  // waits for pending promises before exiting, so a sibling pulse
+  // spawn started in the next frame still sees the file. Errors stay
+  // swallowed (a missing cache simply triggers a fresh spawn next time).
+  void writeGitCache(entry).catch(() => {});
   return fresh;
+}
+
+/**
+ * Test-only: clear the in-process git cache so consecutive tests
+ * don't bleed into each other. Named export — production code never
+ * imports it.
+ */
+export function __resetGitMemCacheForTests(): void {
+  memGitCache.clear();
 }
