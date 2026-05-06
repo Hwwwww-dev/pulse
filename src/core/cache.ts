@@ -2,6 +2,7 @@ import { mkdir, rename } from "fs/promises";
 import { dirname } from "path";
 import type {
   CacheIndexFile,
+  ClaudeStdinPayload,
   GeneralCacheFile,
   JsonlCursor,
   PulseSnapshot,
@@ -9,6 +10,7 @@ import type {
 } from "./types.ts";
 import { USAGE_SAMPLES_GC_MS } from "./types.ts";
 import { paths } from "./paths.ts";
+import { isRateLimitNewer } from "./carryForward.ts";
 
 async function ensureDir(path: string): Promise<void> {
   await mkdir(path, { recursive: true });
@@ -22,18 +24,47 @@ async function atomicWriteJson(filePath: string, data: unknown): Promise<void> {
 }
 
 /**
- * Race-safe write: re-reads disk right before writing and skips if the
- * on-disk `updated_at` is newer than ours. Protects against concurrent
- * writers (multiple pulse instances) clobbering each other's data.
- * Still has a small TOCTOU window but pulse self-heals on next render.
+ * Per-axis newest-wins merge for rate_limits. Used when writing general.json
+ * so a concurrent pulse instance with a stale stdin view can't clobber
+ * fresher values another window already published.
+ *
+ * Freshness is lexicographic on (resets_at, used_percentage) — see
+ * {@link isRateLimitNewer}. Entries whose `resets_at` is already in the
+ * past are filtered out so general.json drops expired windows on the
+ * first write after rollover, instead of accumulating ghost values that
+ * the read path would have to keep filtering. Side effect: a process
+ * idle across the moment of rollover with no fresh axis data on either
+ * side will let the file lose that axis — which is the correct outcome
+ * (we genuinely have no current account-level value to display).
+ *
+ * Note: there is still a TOCTOU window between read-existing and the
+ * atomic rename. Two concurrent writers can each compute different
+ * merges and the later rename wins; worst case loses one tick on a
+ * single axis. ~1000× rarer than the timestamp-only race this replaces.
  */
-async function writeLatestJson<T extends { updated_at: number }>(
-  filePath: string,
-  data: T,
-): Promise<void> {
-  const existing = await readJson<T>(filePath);
-  if (existing && existing.updated_at > data.updated_at) return;
-  await atomicWriteJson(filePath, data);
+function mergeGeneralRateLimits(
+  current: ClaudeStdinPayload["rate_limits"],
+  existing: ClaudeStdinPayload["rate_limits"],
+  nowMs: number,
+): ClaudeStdinPayload["rate_limits"] | undefined {
+  const nowSec = Math.floor(nowMs / 1000);
+  const pick = <W extends { used_percentage: number; resets_at: number }>(
+    a: W | undefined,
+    b: W | undefined,
+  ): W | undefined => {
+    const liveA = a !== undefined && a.resets_at > nowSec ? a : undefined;
+    const liveB = b !== undefined && b.resets_at > nowSec ? b : undefined;
+    if (liveA === undefined) return liveB;
+    if (liveB === undefined) return liveA;
+    return isRateLimitNewer(liveA, liveB) ? liveA : liveB;
+  };
+  const five = pick(current?.five_hour, existing?.five_hour);
+  const seven = pick(current?.seven_day, existing?.seven_day);
+  if (five === undefined && seven === undefined) return undefined;
+  return {
+    ...(five !== undefined ? { five_hour: five } : {}),
+    ...(seven !== undefined ? { seven_day: seven } : {}),
+  };
 }
 
 async function readJson<T>(filePath: string): Promise<T | undefined> {
@@ -151,6 +182,20 @@ export async function writeCache(
   const todaySessions = merged.filter((s) => s.last_updated_at >= startOfDay);
   const todayTotalCost = todaySessions.reduce((a, s) => a + s.total_cost_usd, 0);
   const todayToolCalls = snapshot.counters.tool_calls_total;
+  // Re-read disk right before writing general.json and merge rate_limits
+  // axis-by-axis. Concurrent pulse instances each carry their own CC
+  // process's stdin view, which may be stale relative to a sibling window
+  // that just received an API response. A timestamp-only race (the old
+  // writeLatestJson behavior) would let the later — but staler — write
+  // win and clobber a fresher rate_limits already on disk; merging
+  // axis-wise on (resets_at, used_percentage) preserves the freshest
+  // value across windows.
+  const existingGeneral = await readGeneral();
+  const mergedRateLimits = mergeGeneralRateLimits(
+    snapshot.claude.rate_limits,
+    existingGeneral?.rate_limits,
+    now,
+  );
   const general: GeneralCacheFile = {
     schema_version: 2,
     updated_at: now,
@@ -159,14 +204,12 @@ export async function writeCache(
       id: snapshot.claude.model.id,
       display_name: snapshot.claude.model.display_name,
     },
-    ...(snapshot.claude.rate_limits !== undefined
-      ? { rate_limits: snapshot.claude.rate_limits }
-      : {}),
+    ...(mergedRateLimits !== undefined ? { rate_limits: mergedRateLimits } : {}),
     today: {
       sessions_seen: todaySessions.length,
       total_cost_usd: todayTotalCost,
       total_tool_calls: todayToolCalls,
     },
   };
-  await writeLatestJson(paths.generalCacheFile(), general);
+  await atomicWriteJson(paths.generalCacheFile(), general);
 }
