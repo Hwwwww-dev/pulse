@@ -348,6 +348,14 @@ export const PulseConfigSchema = z
       .object({
         enabled: z.boolean(),
         timeout_ms: z.number().int().positive(),
+        /**
+         * Disk-cache TTL for git status results, in ms. With Claude Code's
+         * active statusline refresh, every frame would otherwise spawn a
+         * new `git status` (~50–200ms). Cached results are reused for this
+         * many ms before re-shelling. 0 disables the cache (always spawn).
+         * Default: 1000ms — git output for the user is at most 1s stale.
+         */
+        cache_ttl_ms: z.number().int().min(0).optional(),
       })
       .strict(),
     cache: z
@@ -498,7 +506,7 @@ export const defaultConfig: PulseConfig = {
     },
   ],
   jsonl: { enabled: true, max_bytes_per_call: 2_097_152 },
-  git: { enabled: true, timeout_ms: 200 },
+  git: { enabled: true, timeout_ms: 200, cache_ttl_ms: 1000 },
   cache: { enabled: true, gc_after_days: 7 },
   runtime: { render_timeout_ms: 500, debug_log: false },
 };

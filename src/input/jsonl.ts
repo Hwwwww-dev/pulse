@@ -58,6 +58,12 @@ const ANSI_SGR_REGEX = /(?:\x1b|\\u001b)\[[\d;]*m/gi;
 // branch yields the level in group 1 or group 2 respectively.
 const THINKING_EFFORT_REGEX =
   /(?:Set model to[\s\S]*? with (low|medium|high|xhigh|max) effort|Set effort level to (low|medium|high|xhigh|max)\b)/i;
+// Fast-path keyword: every transcript line that could carry an effort
+// echo contains the literal "Set " (either "Set model to" or "Set effort").
+// The vast majority of transcript lines are tool calls / assistant text /
+// usage rows that never contain this substring, so a cheap indexOf gate
+// avoids the ANSI strip + regex on ~100% of lines.
+const EFFORT_FAST_PATH = "Set ";
 
 export interface JsonlParseResult {
   counters: SessionCounters;
@@ -128,10 +134,16 @@ function consumeLine(counters: SessionCounters, line: string): void {
   // Detect `/model` effort-change echoes emitted as local-command-stdout.
   // Strip ANSI SGR wrappers first — Claude Code bolds the chosen level with
   // `\x1b[1mxhigh\x1b[22m`, which would otherwise break the regex anchor.
-  const effortMatch = THINKING_EFFORT_REGEX.exec(line.replace(ANSI_SGR_REGEX, ""));
-  if (effortMatch) {
-    const level = (effortMatch[1] ?? effortMatch[2])!.toLowerCase();
-    counters.thinking_effort = level as ThinkingEffortLevel;
+  // Fast-path: only the local-command-stdout lines that echo `Set model …`
+  // or `Set effort level …` can carry effort info. indexOf is O(n) but with
+  // a SIMD-fast inner loop and no allocation, vs the ANSI strip + regex
+  // pair which both scan and copy. Skip both for ~100% of lines.
+  if (line.indexOf(EFFORT_FAST_PATH) >= 0) {
+    const effortMatch = THINKING_EFFORT_REGEX.exec(line.replace(ANSI_SGR_REGEX, ""));
+    if (effortMatch) {
+      const level = (effortMatch[1] ?? effortMatch[2])!.toLowerCase();
+      counters.thinking_effort = level as ThinkingEffortLevel;
+    }
   }
 
   // Parse timestamp from entry (top-level field)
@@ -277,6 +289,24 @@ export async function parseJsonlIncremental(
   }
 
   const file = Bun.file(transcriptPath);
+
+  // Idle-frame fast-path: same transcript and no new bytes since the
+  // previous parse. Under refreshInterval=1 most frames hit this — Bun's
+  // .size is a sync stat, so we skip the await file.exists() round-trip,
+  // skip the chunk loop, and skip cloneCounters' deep copy. The returned
+  // counters reuse prevCursor's reference; aggregator/render treat it as
+  // read-only and the next frame will reload prevCursor from disk anyway.
+  if (
+    prevCursor &&
+    prevCursor.transcript_path === transcriptPath &&
+    file.size === prevCursor.last_byte_offset
+  ) {
+    return {
+      counters: prevCursor.counters,
+      cursor: { ...prevCursor, updated_at: Date.now() } as JsonlCursor,
+    };
+  }
+
   const exists = await file.exists();
   if (!exists) {
     return {
@@ -327,7 +357,10 @@ export async function parseJsonlIncremental(
       const line = raw.endsWith("\r") ? raw.slice(0, -1) : raw;
       consumeLine(counters, line);
       lineNumber += 1;
-      chunkConsumed += new TextEncoder().encode(raw + "\n").length;
+      // Bytes-on-disk: utf8 length of raw + 1 for the consumed `\n`.
+      // Buffer.byteLength is allocation-free and ~10x faster than
+      // constructing a fresh TextEncoder + Uint8Array per line.
+      chunkConsumed += Buffer.byteLength(raw, "utf8") + 1;
       idx = nl + 1;
     }
     if (chunkConsumed === 0) {
@@ -346,7 +379,7 @@ export async function parseJsonlIncremental(
         const line = raw.endsWith("\r") ? raw.slice(0, -1) : raw;
         consumeLine(counters, line);
         lineNumber += 1;
-        rc += new TextEncoder().encode(raw + "\n").length;
+        rc += Buffer.byteLength(raw, "utf8") + 1;
         ri = nl + 1;
       }
       offset += rc;
